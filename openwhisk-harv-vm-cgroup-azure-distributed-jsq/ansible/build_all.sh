@@ -3,7 +3,7 @@ INVOKERS=("caslab@10.150.21.190" "caslab@10.150.21.191" "caslab@10.150.21.192" "
 
 for INVOKER in "${INVOKERS[@]}"
 	do
-		ssh $INVOKER "cd ~/workspace/openwhisk_pickme/ansible; ./build.sh" &
+		ssh $INVOKER "cd ~/workspace/openwhisk-comp/openwhisk-harv-vm-cgroup-azure-distributed-jsq/ansible; ./build.sh" &
 	done
 
 ./build.sh

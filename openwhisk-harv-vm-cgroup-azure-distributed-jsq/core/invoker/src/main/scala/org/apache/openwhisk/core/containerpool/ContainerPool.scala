@@ -126,6 +126,7 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
       if(cpuUtil <= 0)
         cpuUtil = r.action.limits.cpu.cores
 
+      logging.info(this, s"cpuLimit: ${cpuLimit}, cpuUtil: ${cpuUtil}, originLimit: ${r.action.limits.cpu.cores}, originUtil: ${r.action.limits.cpu.cores}")
       // Only process request, if there are no other requests waiting for free slots, or if the current request is the
       // next request to process
       // It is guaranteed, that only the first message on the buffer is resent.
@@ -411,8 +412,6 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
     // logging.warn(this, s"cpu consumption ${cpuConsumptionOf(pool) + cpuUtil}, total cpu ${availCpu}, enough rsc ${memoryConsumptionOf(pool) + memory.toMB <= availMemory.toMB && cpuConsumptionOf(pool) + cpuUtil <= availCpu*overSubscribedRate}")
 
     // memoryConsumptionOf(pool) + memory.toMB <= poolConfig.userMemory.toMB
-    logging.info(s"memory: ${memoryConsumptionOf(pool) + memory.toMB <= availMemory.toMB}, cpu: ${cpuConsumptionOf(pool) + cpuUtil <= availCpu*overSubscribedRate}")
-    logging.info(s"1: ${memoryConsumptionOf(pool)}, 2: ${memory.toMB}, 3: ${availMemory.toMB}, 4: ${cpuConsumptionOf(pool)}, 5: ${cpuUtil}, 6: ${availCpu*overSubscribedRate}")
     memoryConsumptionOf(pool) + memory.toMB <= availMemory.toMB && cpuConsumptionOf(pool) + cpuUtil <= availCpu*overSubscribedRate
   }
 }

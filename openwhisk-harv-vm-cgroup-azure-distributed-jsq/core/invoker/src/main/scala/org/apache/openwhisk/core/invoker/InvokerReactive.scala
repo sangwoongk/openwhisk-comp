@@ -369,6 +369,9 @@ class InvokerReactive(
       }
       buffer_kvp.close
     }
+    else {
+      memory = 102400
+    }
     
     healthProducer.send("health", PingMessage(instance, cpu, memory)).andThen {
       case Failure(t) => logging.error(this, s"failed to ping the controller: $t")

@@ -399,6 +399,9 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         }
         buffer_kvp.close
       }
+      else {
+        memory = 102400
+      }
   
       if(cpu != availCpu || memory != availMemory.toMB) {
         availCpu = cpu

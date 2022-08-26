@@ -348,6 +348,9 @@ class InvokerReactive(
       }
       buffer_kvp.close
     }
+    else {
+      cpu = 16.0
+    }
 
     // check total available memory
     if(Files.exists(Paths.get(memoryMBPath))) {

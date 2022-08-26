@@ -411,6 +411,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
     // logging.warn(this, s"cpu consumption ${cpuConsumptionOf(pool) + cpuUtil}, total cpu ${availCpu}, enough rsc ${memoryConsumptionOf(pool) + memory.toMB <= availMemory.toMB && cpuConsumptionOf(pool) + cpuUtil <= availCpu*overSubscribedRate}")
 
     // memoryConsumptionOf(pool) + memory.toMB <= poolConfig.userMemory.toMB
+    logging.info(s"memory: ${memoryConsumptionOf(pool) + memory.toMB <= availMemory.toMB}, cpu: ${cpuConsumptionOf(pool) + cpuUtil <= availCpu*overSubscribedRate}")
+    logging.info(s"1: ${memoryConsumptionOf(pool)}, 2: ${memory.toMB}, 3: ${availMemory.toMB}, 4: ${cpuConsumptionOf(pool)}, 5: ${cpuUtil}, 6: ${availCpu*overSubscribedRate}")
     memoryConsumptionOf(pool) + memory.toMB <= availMemory.toMB && cpuConsumptionOf(pool) + cpuUtil <= availCpu*overSubscribedRate
   }
 }

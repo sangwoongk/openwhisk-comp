@@ -46,10 +46,10 @@ import java.nio.file.{Paths, Files} // yanqi, check file exists
 // yanqi, needs to be renamed, otherwise conflit with immutable collection
 import scala.collection.mutable.{Map=>MMap}
 // for query azure vm events
-import java.net.URL
+// import java.net.URL
 // yanqi, for parsing azure event time
-import java.util.Date
-import java.text.SimpleDateFormat
+// import java.util.Date
+// import java.text.SimpleDateFormat
 
 object InvokerReactive extends InvokerProvider {
 
@@ -102,8 +102,8 @@ class InvokerReactive(
   /***** rsc accounting, yanqi *****/
   val coreNumPath = "/hypervkvp/.kvp_pool_0"
   val memoryMBPath = "/hypervkvp/.kvp_pool_2"
-  val cgroupCpuPath = "/sys/fs/cgroup/cpuacct/docker/cpuacct.usage"
-  val cgroupMemPath = "/sys/fs/cgroup/memory/docker/memory.stat"
+  val cgroupCpuPath = "/sys/fs/cgroup/cpuacct/cpuacct.usage"
+  val cgroupMemPath = "/sys/fs/cgroup/memory/memory.stat"
   var cgroupCpuTime: Long = 0   // in ns
   var cgroupCpuUsage: Double = 0.0 // virtual cpus
   var cgroupMemUsage: Long = 0 // in mb
@@ -561,6 +561,7 @@ class InvokerReactive(
       logging.info(this, s"healthPing cpu=${cpu}, mem=${memory}, cgroupCpuUsage=${cgroupCpuUsage}, cgroupMemUsage=${cgroupMemUsage}")
       logging.info(this, s"healthPing mean_cgroupCpuUsage=${mean_cpu_usage}, mean_cgroupMemUsage=${mean_mem_usage}, max_cgroupCpuUsage=${max_cpu_usage}, max_cgroupMemUsage=${max_mem_usage}")
     }
+    /*
     // parse azure scheduled vm events    
     import AzureMetaDataJsonProtocol._
     val meta_data_conn = new URL(azureVmEventUrl).openConnection
@@ -605,6 +606,8 @@ class InvokerReactive(
     if(vm_event_sched) {
       logging.info(this, s"vmEvent ${event_type} id ${event_id} scheduled at = ${event_earliest_str}, ${(vmEventTime - cur_ms)/1000}s in the future")
     }
+    */
+    val vm_event_sched = false
 
     // send the health ping
     healthProducer.send("health", PingMessage(

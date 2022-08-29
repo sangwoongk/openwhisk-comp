@@ -41,8 +41,7 @@
     #
     # invoker_ids: the exact id of each invoker, and each invoker will names names as {name_prefix}{invoker_id}
     invoker_ids:
-      - 100
-      - 200
+      - 0
 
   roles:
     - invoker

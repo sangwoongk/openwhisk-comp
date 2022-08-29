@@ -87,8 +87,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
   var cgroupCheckTime: Long = 0 // in ns
   val coreNumPath = "/hypervkvp/.kvp_pool_0"
   val memoryMBPath = "/hypervkvp/.kvp_pool_2"
-  val cgroupCpuPath = "/sys/fs/cgroup/cpuacct/docker/cpuacct.usage"
-  val cgroupMemPath = "/sys/fs/cgroup/memory/docker/memory.stat"
+  val cgroupCpuPath = "/sys/fs/cgroup/cpuacct/cpuacct.usage"
+  val cgroupMemPath = "/sys/fs/cgroup/memory/memory.stat"
   var cgroupCpuTime: Long = 0   // in ns
   var cgroupCpuUsage: Double = 0.0 // virtual cpus
   var cgroupMemUsage: Long = 0 // in mb
@@ -164,7 +164,10 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
 
   // get mem usage of a single container
   def getContainerMemoryUsage(containerId: String): ByteSize = {
-    val dockerMemPath: String = "/sys/fs/cgroup/memory/docker/" + containerId + "/memory.stat"
+    // val dockerMemPath: String = "/sys/fs/cgroup/memory/docker/" + containerId + "/memory.stat"
+    val dockerMemPathOrigin: String = s"/sys/fs/cgroup/memory/docker/${containerId}/memory.stat"
+    val dockerMemPathSlice: String = s"/sys/fs/cgroup/memory/system.slice/docker-${containerId}.scope/memory.stat"
+    val dockerMemPath: String = if (Files.exists(Paths.get(dockerMemPathOrigin))) dockerMemPathOrigin else dockerMemPathSlice
     val memSize = parse_cgroup_mem_state(dockerMemPath)
     ByteSize.fromString(memSize.toString + "M")
   }

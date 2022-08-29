@@ -102,8 +102,8 @@ class InvokerReactive(
   /***** rsc accounting, yanqi *****/
   val coreNumPath = "/hypervkvp/.kvp_pool_0"
   val memoryMBPath = "/hypervkvp/.kvp_pool_2"
-  val cgroupCpuPath = "/sys/fs/cgroup/cpuacct/cgroup_harvest_vm/cpuacct.usage"
-  val cgroupMemPath = "/sys/fs/cgroup/memory/cgroup_harvest_vm/memory.stat"
+  val cgroupCpuPath = "/sys/fs/cgroup/cpuacct/docker/cpuacct.usage"
+  val cgroupMemPath = "/sys/fs/cgroup/memory/docker/memory.stat"
   var cgroupCpuTime: Long = 0   // in ns
   var cgroupCpuUsage: Double = 0.0 // virtual cpus
   var cgroupMemUsage: Long = 0 // in mb
@@ -470,6 +470,9 @@ class InvokerReactive(
       }
       buffer_kvp.close
     }
+    else {
+      cpu = 16
+    }
 
     // check total available memory
     if(Files.exists(Paths.get(memoryMBPath))) {
@@ -487,6 +490,9 @@ class InvokerReactive(
         }
       }
       buffer_kvp.close
+    }
+    else {
+      memory = 102400
     }
     
     var rscFileExists: Boolean = true

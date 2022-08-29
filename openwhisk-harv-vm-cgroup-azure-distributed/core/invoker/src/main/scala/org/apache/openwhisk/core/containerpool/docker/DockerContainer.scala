@@ -121,8 +121,8 @@ object DockerContainer {
       cpu_period.toString,
       "--cpu-quota",
       cpu_quota.toString,
-      "--cgroup-parent",
-      "/cgroup_harvest_vm/",
+      // "--cgroup-parent",
+      // "/cgroup_harvest_vm/",
       "--memory",
       s"${memory.toMB}m",
       "--memory-swap",
@@ -215,7 +215,7 @@ class DockerContainer(protected val id: ContainerId,
   // yanqi, path to read docker cpu usage (in ns)
   // protected val dockerCpuPath: String = "/cpu_docker/" + id.asString + "/cpuacct.usage"
   // for cgroup specifically
-  protected val dockerCpuPath: String = "/sys/fs/cgroup/cpu/cgroup_harvest_vm/" + id.asString + "/cpuacct.usage"
+  protected val dockerCpuPath: String = "/sys/fs/cgroup/cpu/docker" + id.asString + "/cpuacct.usage"
 
   override def suspend()(implicit transid: TransactionId): Future[Unit] = {
     super.suspend().flatMap(_ => if (useRunc) runc.pause(id) else docker.pause(id))
@@ -274,7 +274,7 @@ class DockerContainer(protected val id: ContainerId,
     val cpu_file_exists = Files.exists(Paths.get(dockerCpuPath))
     var start_docker_cpu_time: Long = 0
     if(!cpu_file_exists) {
-      logging.error(this, s"file /sys/fs/cgroup/cpu/cgroup_harvest_vm/${id.asString}/cpuacct.usage doesn't exist")
+      logging.error(this, s"file /sys/fs/cgroup/cpu/docker/${id.asString}/cpuacct.usage doesn't exist")
     } else
       start_docker_cpu_time = getDockerCpuTime()
 

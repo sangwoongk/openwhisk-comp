@@ -285,6 +285,9 @@ class ContainerProxy(
     case Event(job: Run, _) =>
       implicit val transid = job.msg.transid
       activeCount += 1
+      // pickme
+      val createStart = Instant.now
+
       // create a new container
       // yanqi, add cpus constraint on docker
       var cpuLimit = job.msg.cpuLimit
@@ -339,8 +342,9 @@ class ContainerProxy(
             storeActivation(transid, activation, context)
         }
         .flatMap { container =>
+          val createEnd = Instant.now
           // now attempt to inject the user code and run the action
-          initializeAndRun(container, job)
+          initializeAndRun(container, job, Option(Interval(createStart, createEnd)))  // [pickme] add interval
             .map(_ => RunCompleted)
         }
         .pipeTo(self)
@@ -589,7 +593,7 @@ class ContainerProxy(
    * @return a future completing after logs have been collected and
    *         added to the WhiskActivation
    */
-  def initializeAndRun(container: Container, job: Run)(implicit tid: TransactionId): Future[WhiskActivation] = {
+  def initializeAndRun(container: Container, job: Run, coldStartTime: Option[Interval] = None)(implicit tid: TransactionId): Future[WhiskActivation] = {
     val actionTimeout = job.action.limits.timeout.duration
     val (env, parameters) = ContainerProxy.partitionArguments(job.msg.content, job.msg.initArgs)
 
@@ -661,12 +665,14 @@ class ContainerProxy(
                 .map(i => Interval(runInterval.start.minusMillis(i.duration.toMillis), runInterval.end))
                 .getOrElse(runInterval)
               cpuUtil = cpu_util  // yanqi, update cpuUtil
+              // [pickme] build activation. This activation is written to DB
               ContainerProxy.constructWhiskActivation(
                 job,
                 initInterval,
                 initRunInterval,
                 runInterval.duration >= actionTimeout,
-                response)
+                response,
+                coldStartTime)
           }
       }
       .recover {
@@ -809,7 +815,8 @@ object ContainerProxy {
                                initInterval: Option[Interval],
                                totalInterval: Interval,
                                isTimeout: Boolean,
-                               response: ActivationResponse) = {
+                               response: ActivationResponse,
+                               coldStartInterval: Option[Interval] = None) = {
     val causedBy = Some {
       if (job.msg.causedBySequence) {
         Parameters(WhiskActivation.causedByAnnotation, JsString(Exec.SEQUENCE))
@@ -831,9 +838,14 @@ object ContainerProxy {
       initInterval.map(initTime => Parameters(WhiskActivation.initTimeAnnotation, initTime.duration.toMillis.toJson))
     }
 
+    val coldTime = {
+      coldStartInterval.map(coldTime => Parameters("coldstartTime", coldTime.duration.toMillis.toJson))
+    }
+
     val binding =
       job.msg.action.binding.map(f => Parameters(WhiskActivation.bindingAnnotation, JsString(f.asString)))
 
+    // [pickme] build activation. Expected to write this to DB
     WhiskActivation(
       activationId = job.msg.activationId,
       namespace = job.msg.user.namespace.name.toPath,
@@ -850,7 +862,7 @@ object ContainerProxy {
           Parameters(WhiskActivation.pathAnnotation, JsString(job.action.fullyQualifiedName(false).asString)) ++
           Parameters(WhiskActivation.kindAnnotation, JsString(job.action.exec.kind)) ++
           Parameters(WhiskActivation.timeoutAnnotation, JsBoolean(isTimeout)) ++
-          causedBy ++ initTime ++ binding
+          causedBy ++ initTime ++ binding ++ coldTime
       })
   }
 

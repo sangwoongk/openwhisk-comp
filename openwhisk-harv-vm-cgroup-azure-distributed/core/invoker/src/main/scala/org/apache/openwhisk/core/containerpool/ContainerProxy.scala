@@ -301,6 +301,8 @@ class ContainerProxy(
         cpuLimit = job.action.limits.cpu.cores
       // yanqi, update timestamp to track cold start time
       job.startInstant = Some(Instant.now)
+      // [pickme]
+      val createStart = Instant.now
 
       val container = factory(
         job.msg.transid,
@@ -360,8 +362,9 @@ class ContainerProxy(
             storeActivation(transid, activation, context)
         }
         .flatMap { container =>
+          val createEnd = Instant.now
           // now attempt to inject the user code and run the action
-          initializeAndRun(container, job)
+          initializeAndRun(container, job, coldStartTime=Option(Interval(createStart, createEnd))) // [pickme] add interval
             .map(_ => RunCompleted)
         }
         .pipeTo(self)
@@ -610,7 +613,7 @@ class ContainerProxy(
    * @return a future completing after logs have been collected and
    *         added to the WhiskActivation
    */
-  def initializeAndRun(container: Container, job: Run)(implicit tid: TransactionId): Future[WhiskActivation] = {
+  def initializeAndRun(container: Container, job: Run, coldStartTime: Option[Interval] = None)(implicit tid: TransactionId): Future[WhiskActivation] = {
     val actionTimeout = job.action.limits.timeout.duration
     val (env, parameters) = ContainerProxy.partitionArguments(job.msg.content, job.msg.initArgs)
 
@@ -691,12 +694,14 @@ class ContainerProxy(
                 totalTime = Duration.create(runInterval.end.toEpochMilli - job.startInstant.get.toEpochMilli, MILLISECONDS).toMillis
               }
 
+              // [pickme] build activation. This activation is written to DB
               ContainerProxy.constructWhiskActivation(
                 job,
                 initInterval,
                 initRunInterval,
                 runInterval.duration >= actionTimeout,
-                response)
+                response,
+                coldStartTime)
           }
       }
       .recover {
@@ -843,7 +848,8 @@ object ContainerProxy {
                                initInterval: Option[Interval],
                                totalInterval: Interval,
                                isTimeout: Boolean,
-                               response: ActivationResponse) = {
+                               response: ActivationResponse,
+                               coldStartInterval: Option[Interval] = None) = {
     val causedBy = Some {
       if (job.msg.causedBySequence) {
         Parameters(WhiskActivation.causedByAnnotation, JsString(Exec.SEQUENCE))
@@ -865,6 +871,11 @@ object ContainerProxy {
       initInterval.map(initTime => Parameters(WhiskActivation.initTimeAnnotation, initTime.duration.toMillis.toJson))
     }
 
+    // [pickme] add coldstart time to activation
+    val coldTime = {
+      coldStartInterval.map(coldTime => Parameters("coldstartTime", coldTime.duration.toMillis.toJson))
+    }
+
     val binding =
       job.msg.action.binding.map(f => Parameters(WhiskActivation.bindingAnnotation, JsString(f.asString)))
 
@@ -884,7 +895,7 @@ object ContainerProxy {
           Parameters(WhiskActivation.pathAnnotation, JsString(job.action.fullyQualifiedName(false).asString)) ++
           Parameters(WhiskActivation.kindAnnotation, JsString(job.action.exec.kind)) ++
           Parameters(WhiskActivation.timeoutAnnotation, JsBoolean(isTimeout)) ++
-          causedBy ++ initTime ++ binding
+          causedBy ++ initTime ++ binding ++ coldTime
       })
   }
 

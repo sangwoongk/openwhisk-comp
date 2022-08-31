@@ -271,7 +271,8 @@ class HarvestVMContainerPoolBalancer(
     val chosen = if (invokersToUse.nonEmpty) {
       val hash = HarvestVMContainerPoolBalancer.generateHash(msg.user.namespace.name, action.fullyQualifiedName(false))
       val homeInvoker = hash % invokersToUse.size
-      val stepSize = stepSizes(hash % stepSizes.size)
+      // val stepSize = stepSizes(hash % stepSizes.size)
+      val stepSize: Int = 1 // [pickme]
 
       // yanqi, check if we can use the distribution
       var cpuLimit: Double = functionCpuLimit.getOrElse(action.fullyQualifiedName(true), 0.0)

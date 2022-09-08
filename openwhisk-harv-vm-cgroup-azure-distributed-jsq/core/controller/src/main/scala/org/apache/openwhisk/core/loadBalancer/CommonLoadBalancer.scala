@@ -246,7 +246,7 @@ abstract class CommonLoadBalancer(config: WhiskConfig,
     // val sendStart = System.currentTimeMillis()
     val sendStart = Instant.now
     logging.info(this, s"[pickme] ${msg.activationId} sendStart: ${sendStart.toEpochMilli()}")
-    logging.info(this, s"[pickme] ${msg.activationId} start~send: ${Interval(msg.transid.meta.start, sendStart)}")
+    logging.info(this, s"[pickme] ${msg.activationId} start~send: ${Interval(msg.transid.meta.start, sendStart).duration.toMillis}")
 
     producer.send(topic, msg).andThen {
       case Success(status) =>

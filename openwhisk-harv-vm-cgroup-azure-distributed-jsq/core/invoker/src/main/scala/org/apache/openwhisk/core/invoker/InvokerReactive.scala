@@ -238,7 +238,7 @@ class InvokerReactive(
         //set trace context to continue tracing
         WhiskTracerProvider.tracer.setTraceContext(transid, msg.traceContext)
         logging.info(this, s"[pickme] ${msg.activationId} sendEnd: ${sendEnd.toEpochMilli()}")
-        logging.info(this, s"[pickme] ${msg.activationId} start~receive: ${Interval(msg.transid.meta.start, sendEnd)}")
+        logging.info(this, s"[pickme] ${msg.activationId} start~receive: ${Interval(msg.transid.meta.start, sendEnd).duration.toMillis}")
 
         if (!namespaceBlacklist.isBlacklisted(msg.user)) {
           val start = transid.started(this, LoggingMarkers.INVOKER_ACTIVATION, logLevel = InfoLevel)

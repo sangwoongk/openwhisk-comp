@@ -598,7 +598,7 @@ class ContainerProxy(
    */
   def initializeAndRun(container: Container, job: Run, coldStartTime: Option[Interval] = None)(implicit tid: TransactionId): Future[WhiskActivation] = {
     // [pickme]
-    logging.info(this, s"[pickme] initializing: ${ContainerProxy.initializing.next()}")
+    // logging.info(this, s"[pickme] initializing: ${ContainerProxy.initializing.next()}")
 
     val actionTimeout = job.action.limits.timeout.duration
     val (env, parameters) = ContainerProxy.partitionArguments(job.msg.content, job.msg.initArgs)
@@ -657,7 +657,7 @@ class ContainerProxy(
           "deadline" -> (Instant.now.toEpochMilli + actionTimeout.toMillis).toString.toJson)
 
         // [pickme]
-        ContainerProxy.initializing.prev()
+        // ContainerProxy.initializing.prev()
 
         container
           .run(

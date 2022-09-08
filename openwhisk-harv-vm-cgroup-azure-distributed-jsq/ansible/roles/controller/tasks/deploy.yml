@@ -27,10 +27,10 @@
       "{{ (controller_index_base|int) + host_group.index(inventory_hostname) }}"
 
 - name: "pull the {{ docker.image.tag }} image of controller"
-  # shell: "docker pull {{docker_registry}}{{ docker.image.prefix }}/controller:{{docker.image.tag}}"
+  shell: "docker pull {{docker_registry}}{{ docker.image.prefix }}/controller:{{docker.image.tag}}"
   # yanqi, controller changed
-  shell: "docker pull sailresearch/openwhisk_harvest_vm_cgroup_controller-jsq:latest"
-  # when: docker_registry != ""
+  #shell: "docker pull sailresearch/openwhisk_harvest_vm_cgroup_controller-jsq:latest"
+  when: docker_registry != ""
   register: result
   until: (result.rc == 0)
   retries: "{{ docker.pull.retries }}"
@@ -314,9 +314,9 @@
   docker_container:
     name: "{{ controller_name }}"
     image:
-      # "{{docker_registry~docker.image.prefix}}/controller:{{ 'cov' if (coverage_enabled) else docker.image.tag }}"
+      "{{docker_registry~docker.image.prefix}}/controller:{{ 'cov' if (coverage_enabled) else docker.image.tag }}"
       # yanqi, controller image changed
-      "sailresearch/openwhisk_harvest_vm_cgroup_controller-jsq:latest"
+      #"sailresearch/openwhisk_harvest_vm_cgroup_controller-jsq:latest"
     state: started
     recreate: true
     restart_policy: "{{ docker.restart.policy }}"

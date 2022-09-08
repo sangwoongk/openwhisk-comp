@@ -41,6 +41,7 @@ import scala.util.{Failure, Success, Random}
 import scala.math
 
 import java.time.Instant
+import org.apache.openwhisk.core.containerpool.Interval
 
 /**
  * Abstract class which provides common logic for all LoadBalancer implementations.
@@ -245,6 +246,7 @@ abstract class CommonLoadBalancer(config: WhiskConfig,
     // val sendStart = System.currentTimeMillis()
     val sendStart = Instant.now
     logging.info(this, s"[pickme] ${msg.activationId} sendStart: ${sendStart.toEpochMilli()}")
+    logging.info(this, s"[pickme] ${msg.activationId} start~send: ${Interval(msg.transid.meta.start, sendStart)}")
 
     producer.send(topic, msg).andThen {
       case Success(status) =>

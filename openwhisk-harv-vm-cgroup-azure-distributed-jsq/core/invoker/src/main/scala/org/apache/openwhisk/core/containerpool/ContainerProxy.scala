@@ -287,7 +287,7 @@ class ContainerProxy(
       activeCount += 1
       // pickme
       val createStart = Instant.now
-      logging.info(this ,s"[pickme] creating: ${ContainerProxy.creating.next()}")
+      // logging.info(this ,s"[pickme] creating: ${ContainerProxy.creating.next()}")
 
       // create a new container
       // yanqi, add cpus constraint on docker
@@ -343,8 +343,9 @@ class ContainerProxy(
             storeActivation(transid, activation, context)
         }
         .flatMap { container =>
+          // ContainerProxy.creating.prev()
           val createEnd = Instant.now
-          ContainerProxy.creating.prev()
+          logging.info(this, s"[pickme] ${job.msg.activationId} create: ${Interval(createStart, createEnd).duration.toMillis}")
           // now attempt to inject the user code and run the action
           initializeAndRun(container, job, Option(Interval(createStart, createEnd)))  // [pickme] add interval
             .map(_ => RunCompleted)
@@ -847,6 +848,11 @@ object ContainerProxy {
 
     val initTime = {
       initInterval.map(initTime => Parameters(WhiskActivation.initTimeAnnotation, initTime.duration.toMillis.toJson))
+    }
+
+    // [pickme]
+    if (initTime.isDefined) {
+      println(s"[pickme] ${job.msg.activationId} init: ${initTime.get}")
     }
 
     val coldTime = {

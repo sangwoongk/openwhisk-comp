@@ -261,6 +261,9 @@ class HarvestVMContainerPoolBalancer(
   override def publish(action: ExecutableWhiskActionMetaData, msg: ActivationMessage)(
     implicit transid: TransactionId): Future[Future[Either[ActivationId, WhiskActivation]]] = {
 
+    // [pickme]
+    val schedStart = System.currentTimeMillis()
+
     val isBlackboxInvocation = action.exec.pull
     val actionType = if (!isBlackboxInvocation) "managed" else "blackbox"
     val (invokersToUse, stepSizes) =
@@ -337,6 +340,10 @@ class HarvestVMContainerPoolBalancer(
           this,
           s"scheduled activation ${msg.activationId}, action '${msg.action.asString}' ($actionType), ns '${msg.user.namespace.name.asString}', mem limit ${memoryLimit.megabytes} MB (${memoryLimitInfo}), time limit ${timeLimit.duration.toMillis} ms cpu limit ${msg.cpuLimit} cpu util ${cpuUtil} (${timeLimitInfo}) to ${invoker}")
         val activationResult = setupActivation(msg, action, invoker, cpuUtil, updateCpuLimit)
+
+        // [pickme]
+        val schedEnd = System.currentTimeMillis()
+        logging.info(this, s"[pickme] ${msg.activationId} scheduling: ${schedEnd - schedStart}")
         sendActivationToInvoker(messageProducer, msg, invoker).map(_ => activationResult)
       }
       .getOrElse {

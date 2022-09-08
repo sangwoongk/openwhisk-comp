@@ -40,6 +40,8 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success, Random}
 import scala.math
 
+import java.time.Instant
+
 /**
  * Abstract class which provides common logic for all LoadBalancer implementations.
  */

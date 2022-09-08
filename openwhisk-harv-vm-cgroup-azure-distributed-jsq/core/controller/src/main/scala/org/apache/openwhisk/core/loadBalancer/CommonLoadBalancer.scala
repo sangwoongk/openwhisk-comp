@@ -240,8 +240,9 @@ abstract class CommonLoadBalancer(config: WhiskConfig,
       logLevel = InfoLevel)
 
     // [pickme]
-    val sendStart = System.currentTimeMillis()
-    logging.info(this, s"[pickme] ${msg.activationId} sendStart: ${sendStart}")
+    // val sendStart = System.currentTimeMillis()
+    val sendStart = Instant.now
+    logging.info(this, s"[pickme] ${msg.activationId} sendStart: ${sendStart.toEpochMilli()}")
 
     producer.send(topic, msg).andThen {
       case Success(status) =>

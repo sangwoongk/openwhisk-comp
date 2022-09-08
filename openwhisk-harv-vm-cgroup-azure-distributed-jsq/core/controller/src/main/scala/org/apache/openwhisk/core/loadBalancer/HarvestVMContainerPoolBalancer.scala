@@ -262,7 +262,7 @@ class HarvestVMContainerPoolBalancer(
     implicit transid: TransactionId): Future[Future[Either[ActivationId, WhiskActivation]]] = {
 
     // [pickme]
-    val schedStart = System.currentTimeMillis()
+    val schedStart = System.nanoTime()
 
     val isBlackboxInvocation = action.exec.pull
     val actionType = if (!isBlackboxInvocation) "managed" else "blackbox"
@@ -342,7 +342,7 @@ class HarvestVMContainerPoolBalancer(
         val activationResult = setupActivation(msg, action, invoker, cpuUtil, updateCpuLimit)
 
         // [pickme]
-        val schedEnd = System.currentTimeMillis()
+        val schedEnd = System.nanoTime()
         logging.info(this, s"[pickme] ${msg.activationId} scheduling: ${schedEnd - schedStart}")
         sendActivationToInvoker(messageProducer, msg, invoker).map(_ => activationResult)
       }

@@ -336,6 +336,8 @@ class InvokerReactive(
 
   /** Is called when an ActivationMessage is read from Kafka */
   def processActivationMessage(bytes: Array[Byte]): Future[Unit] = {
+    // [pickme]
+    val sendEnd = Instant.now
     Future(ActivationMessage.parse(new String(bytes, StandardCharsets.UTF_8)))
       .flatMap(Future.fromTry)
       .flatMap { msg =>
@@ -346,6 +348,8 @@ class InvokerReactive(
 
         //set trace context to continue tracing
         WhiskTracerProvider.tracer.setTraceContext(transid, msg.traceContext)
+        logging.info(this, s"[pickme] ${msg.activationId} sendEnd: ${sendEnd.toEpochMilli()}")
+        logging.info(this, s"[pickme] ${msg.activationId} start~receive: ${Interval(msg.transid.meta.start, sendEnd).duration.toMillis}")
 
         // update controllerIdMap. yanqi
         controllerIdMap.update(msg.rootControllerIndex.asString)

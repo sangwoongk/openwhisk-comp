@@ -363,6 +363,7 @@ class ContainerProxy(
         }
         .flatMap { container =>
           val createEnd = Instant.now
+          logging.info(this, s"[pickme] ${job.msg.activationId} create: ${Interval(createStart, createEnd).duration.toMillis}")
           // now attempt to inject the user code and run the action
           initializeAndRun(container, job, coldStartTime=Option(Interval(createStart, createEnd))) // [pickme] add interval
             .map(_ => RunCompleted)
@@ -869,6 +870,10 @@ object ContainerProxy {
 
     val initTime = {
       initInterval.map(initTime => Parameters(WhiskActivation.initTimeAnnotation, initTime.duration.toMillis.toJson))
+    }
+
+    if (initTime.isDefined) {
+      println(s"[pickme] ${job.msg.activationId} init: ${initTime.get}")
     }
 
     // [pickme] add coldstart time to activation

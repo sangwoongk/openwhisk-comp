@@ -431,7 +431,7 @@ class HarvestVMContainerPoolBalancer(
         // [pickme]
         val schedEnd = System.nanoTime()
         logging.info(this, s"[pickme] ${msg.activationId} scheduling: ${schedEnd - schedStart}")
-        logging.info(this, s"[pickme] ${msg.activationId} longSchedStart: ${longSchedStart}")
+        logging.info(this, s"[pickme] ${msg.activationId} longSchedStart: ${longSchedStart.toEpochMilli()}")
         sendActivationToInvoker(messageProducer, msg, invoker).map(_ => activationResult)
       }
       .getOrElse {

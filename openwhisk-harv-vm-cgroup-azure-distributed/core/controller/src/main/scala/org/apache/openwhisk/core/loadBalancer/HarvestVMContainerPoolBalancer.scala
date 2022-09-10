@@ -47,7 +47,7 @@ import scala.math.max
 import scala.collection.mutable.{Map=>MMap}
 // import util.control.Breaks._
 
-import java.time.Instant
+// import java.time.Instant
 
 /**
  * A loadbalancer that schedules workload based on a hashing-algorithm.
@@ -309,7 +309,7 @@ class HarvestVMContainerPoolBalancer(
     implicit transid: TransactionId): Future[Future[Either[ActivationId, WhiskActivation]]] = {
     // [pickme]
     val schedStart = System.nanoTime()
-    val longSchedStart = Instant.now
+    // val longSchedStart = Instant.now
 
     // update load record, yanqi
     loadProcessor ! LoadSample(action.fullyQualifiedName(true))
@@ -431,7 +431,7 @@ class HarvestVMContainerPoolBalancer(
         // [pickme]
         val schedEnd = System.nanoTime()
         logging.info(this, s"[pickme] ${msg.activationId} scheduling: ${schedEnd - schedStart}")
-        logging.info(this, s"[pickme] ${msg.activationId} longSchedStart: ${longSchedStart.toEpochMilli()}")
+        logging.info(this, s"[pickme] ${msg.activationId} schedStart: ${schedStart}")
         sendActivationToInvoker(messageProducer, msg, invoker).map(_ => activationResult)
       }
       .getOrElse {

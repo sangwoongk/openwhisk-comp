@@ -338,6 +338,7 @@ class InvokerReactive(
   def processActivationMessage(bytes: Array[Byte]): Future[Unit] = {
     // [pickme]
     val sendEnd = Instant.now
+    val longSendEnd = System.nanoTime()
     Future(ActivationMessage.parse(new String(bytes, StandardCharsets.UTF_8)))
       .flatMap(Future.fromTry)
       .flatMap { msg =>
@@ -349,6 +350,7 @@ class InvokerReactive(
         //set trace context to continue tracing
         WhiskTracerProvider.tracer.setTraceContext(transid, msg.traceContext)
         logging.info(this, s"[pickme] ${msg.activationId} sendEnd: ${sendEnd.toEpochMilli()}")
+        logging.info(this, s"[pickme] ${msg.activationId} longSendEnd: ${longSendEnd}")
         logging.info(this, s"[pickme] ${msg.activationId} start~receive: ${Interval(msg.transid.meta.start, sendEnd).duration.toMillis}")
 
         // update controllerIdMap. yanqi

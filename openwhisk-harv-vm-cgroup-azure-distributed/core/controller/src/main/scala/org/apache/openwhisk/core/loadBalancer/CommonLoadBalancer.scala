@@ -487,8 +487,8 @@ abstract class CommonLoadBalancer(config: WhiskConfig,
 
     producer.send(topic, msg).andThen {
       case Success(status) =>
-        val longSchedEnd = Instant.now
-        logging.info(this, s"[pickme] ${msg.activationId} longSchedEnd: ${longSchedEnd.toEpochMilli()}")
+        val longSchedEnd = System.nanoTime()
+        logging.info(this, s"[pickme] ${msg.activationId} longSchedEnd: ${longSchedEnd}")
         transid.finished(
           this,
           start,

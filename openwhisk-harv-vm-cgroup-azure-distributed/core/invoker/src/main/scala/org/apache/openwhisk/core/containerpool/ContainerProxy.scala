@@ -695,7 +695,7 @@ class ContainerProxy(
               }
 
               // [pickme] build activation. This activation is written to DB
-              val invokerInterval = Option(Interval(job.msg.transid.meta.invokerStart.getOrElse(initRunInterval.end), initRunInterval.end))
+              val invokerInterval = Option(Interval(job.msg.transid.meta.invokerStart.getOrElse(initRunInterval.start), initRunInterval.start))
               ContainerProxy.constructWhiskActivation(
                 job,
                 initInterval,
@@ -879,8 +879,8 @@ object ContainerProxy {
       coldStartInterval.map(coldTime => Parameters("coldstartTime", coldTime.duration.toMillis.toJson))
     }
 
-    val invokerTime = {
-      invokerInterval.map(invokerTime => Parameters("invokerTime", invokerTime.duration.toMillis.toJson))
+    val invokerWaitTime = {
+      invokerInterval.map(invokerTime => Parameters("invokerWaitTime", invokerTime.duration.toMillis.toJson))
     }
 
     val binding =
@@ -902,7 +902,7 @@ object ContainerProxy {
           Parameters(WhiskActivation.pathAnnotation, JsString(job.action.fullyQualifiedName(false).asString)) ++
           Parameters(WhiskActivation.kindAnnotation, JsString(job.action.exec.kind)) ++
           Parameters(WhiskActivation.timeoutAnnotation, JsBoolean(isTimeout)) ++
-          causedBy ++ initTime ++ binding ++ coldTime ++ invokerTime
+          causedBy ++ initTime ++ binding ++ coldTime ++ invokerWaitTime
       })
   }
 

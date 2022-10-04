@@ -343,6 +343,7 @@ class InvokerReactive(
         // active-ack.
 
         implicit val transid: TransactionId = msg.transid
+        transid.meta.invokerStart = Option(Instant.now)
 
         //set trace context to continue tracing
         WhiskTracerProvider.tracer.setTraceContext(transid, msg.traceContext)

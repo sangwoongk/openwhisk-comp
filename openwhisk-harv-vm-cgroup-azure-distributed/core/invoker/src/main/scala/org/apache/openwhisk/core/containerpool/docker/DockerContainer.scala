@@ -215,7 +215,7 @@ class DockerContainer(protected val id: ContainerId,
   // yanqi, path to read docker cpu usage (in ns)
   // protected val dockerCpuPath: String = "/cpu_docker/" + id.asString + "/cpuacct.usage"
   // for cgroup specifically
-  protected val dockerCpuPathOrigin: String = "/sys/fs/cgroup/cpu/docker" + id.asString + "/cpuacct.usage"
+  protected val dockerCpuPathOrigin: String = "/sys/fs/cgroup/cpu/docker/" + id.asString + "/cpuacct.usage"
   protected val dockerCpuPathSlice: String = "/sys/fs/cgroup/cpu/system.slice/docker-" + id.asString + ".scope/cpuacct.usage"
   protected val dockerCpuPath: String = if (Files.exists(Paths.get(dockerCpuPathOrigin))) dockerCpuPathOrigin else dockerCpuPathSlice
   // protected val dockerCpuPath: String = "/sys/fs/cgroup/cpu/cpuacct.usage"

@@ -275,7 +275,7 @@ class DockerContainer(protected val id: ContainerId,
     } else
       start_docker_cpu_time = getDockerCpuTime()
 
-    // var first_api_end_ns = System.nanoTime
+    var first_api_end_ns = System.nanoTime
     // logging.warn(this, s"1st docker cpuacct.usage api time = ${(first_api_end_ns - start_system_ns)/1000000.0}ms")
 
     val http = httpConnection.getOrElse {
@@ -298,6 +298,7 @@ class DockerContainer(protected val id: ContainerId,
         val finished = Instant.now()
         // yanqi, docker cpu usage
         val end_system_ns = System.nanoTime
+        //val real_time_ns = (finished.toEpochMilli() - started.toEpochMilli()) * 1000000
         var end_docker_cpu_time: Long = 0
         if(cpu_file_exists)
           end_docker_cpu_time = getDockerCpuTime()
@@ -306,6 +307,8 @@ class DockerContainer(protected val id: ContainerId,
         // logging.warn(this, s"2nd docker cpuacct.usage api time = ${(second_api_end_ns - end_system_ns)/1000000.0}ms")
 
         val cpu_util: Double = math.ceil((end_docker_cpu_time - start_docker_cpu_time).toDouble/(end_system_ns - start_system_ns).toDouble*100).toInt/100.0
+        //val raw_cpu_util: Double = (end_docker_cpu_time - start_docker_cpu_time)/real_time_ns.toDouble
+        //val cpu_util: Double = math.round(raw_cpu_util*10)/10.0
         logging.info(this, s"Container ${id.asString} cpu util = ${cpu_util}")
 
         // logging.warn(this, s"compute cpu_util = ${(System.nanoTime - second_api_end_ns)/1000000.0}ms")

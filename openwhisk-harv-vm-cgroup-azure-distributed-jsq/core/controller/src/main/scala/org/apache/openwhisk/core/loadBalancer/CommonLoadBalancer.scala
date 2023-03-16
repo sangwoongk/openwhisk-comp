@@ -20,6 +20,7 @@ package org.apache.openwhisk.core.loadBalancer
 import akka.actor.ActorRef
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.LongAdder
+//import java.time.{Instant}
 
 import akka.actor.{ActorSystem, Actor, Props}
 import akka.event.Logging.InfoLevel
@@ -74,8 +75,10 @@ abstract class CommonLoadBalancer(config: WhiskConfig,
   protected[loadBalancer] val functionCpuUtilDistr = MMap[FullyQualifiedEntityName, Distribution]()
   // value for docker --cpus limit
   protected[loadBalancer] val functionCpuLimit = TrieMap[FullyQualifiedEntityName, Double]()
-  protected val cpuUtilNumCores:Int = 40
-  protected val cpuUtilUpdatBatch:Int = 100
+  // protected val cpuUtilNumCores:Int = 40
+  protected val cpuUtilNumCores:Int = 2
+  // protected val cpuUtilUpdatBatch:Int = 100
+  protected val cpuUtilUpdatBatch:Int = 5
   protected val cpuUtilPercentile: Double = 0.75
   protected val cpuLimitPercentile: Double = 0.99
   protected val functionSampleRate: Double = 1.0
@@ -339,6 +342,7 @@ abstract class CommonLoadBalancer(config: WhiskConfig,
         releaseInvoker(invoker, entry)
 
         // yanqi, update cpu usage
+        // println("[sghan]CompletionMessage,"+Instant.now().toEpochMilli()+",tid:,"+tid.toString+",invoker,"+invoker.toInt)
         if(cpuUtil > 0 && randomGen.nextDouble <= functionSampleRate)
           dataProcessor ! InvocationSample(entry.fullyQualifiedEntityName, cpuUtil, entry.updateCpuLimit)
         logging.info(this, s"function ${entry.fullyQualifiedEntityName.asString}, activation id ${aid}, cpu usage = ${cpuUtil}")(tid)

@@ -22,7 +22,7 @@ import org.apache.openwhisk.common.{AkkaLogging, LoggingMarkers, TransactionId}
 import org.apache.openwhisk.core.connector.MessageFeed
 import org.apache.openwhisk.core.entity._
 import org.apache.openwhisk.core.entity.size._
-
+import java.time.Instant
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.concurrent.duration._
@@ -86,6 +86,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
   var prevCheckTime: Long = 0 
   val coreNumPath = "/hypervkvp/.kvp_pool_0"
   val memoryMBPath = "/hypervkvp/.kvp_pool_2"
+  var past_stamp: Long = -1
+  var past_util = -1
 
   prewarmConfig.foreach { config =>
     logging.info(this, s"pre-warming ${config.count} ${config.exec.kind} ${config.cpuLimit.toString} ${config.memoryLimit.toString}")(
@@ -117,7 +119,10 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
     case r: Run =>
       // Check if the message is resent from the buffer. Only the first message on the buffer can be resent.
       val isResentFromBuffer = runBuffer.nonEmpty && runBuffer.dequeueOption.exists(_._1.msg == r.msg)
-
+      if (past_stamp != Instant.now().toEpochMilli()){
+        // println("[sghan] cpu util:," + (cpuConsumptionOf(busyPool)/2.0 * 3.0 + memoryConsumptionOf(busyPool)/2048.0 * 1.0) + ",time:," + Instant.now().toEpochMilli())
+        past_stamp = Instant.now().toEpochMilli() 
+      }
       // yanqi, use estimated cpu usage
       var cpuLimit = r.msg.cpuLimit
       var cpuUtil  = r.msg.cpuUtil
@@ -126,7 +131,7 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
       if(cpuUtil <= 0)
         cpuUtil = r.action.limits.cpu.cores
 
-      logging.info(this, s"cpuLimit: ${cpuLimit}, cpuUtil: ${cpuUtil}, originLimit: ${r.action.limits.cpu.cores}, originUtil: ${r.action.limits.cpu.cores}")
+      //logging.info(this, s"cpuLimit: ${cpuLimit}, cpuUtil: ${cpuUtil}, originLimit: ${r.action.limits.cpu.cores}, originUtil: ${r.action.limits.cpu.cores}")
       // Only process request, if there are no other requests waiting for free slots, or if the current request is the
       // next request to process
       // It is guaranteed, that only the first message on the buffer is resent.
@@ -241,6 +246,11 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
 
     // Container is free to take more work
     case NeedWork(warmData: WarmedData) =>
+      if (past_stamp != Instant.now().toEpochMilli()){
+        // println("[sghan] cpu util:," + (cpuConsumptionOf(busyPool)/2.0 * 3.0 + memoryConsumptionOf(busyPool)/2048.0 * 1.0) + ",time:," + Instant.now().toEpochMilli())
+        //println("[sghan] cpu util:," + cpuConsumptionOf(busyPool ++ freePool) + ",time:," + Instant.now().toEpochMilli())
+        past_stamp = Instant.now().toEpochMilli()
+      }
       feed ! MessageFeed.Processed
       val oldData = freePool.get(sender()).getOrElse(busyPool(sender()))
       val newData =
@@ -266,10 +276,20 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
 
     // Container is prewarmed and ready to take work
     case NeedWork(data: PreWarmedData) =>
+      if (past_stamp != Instant.now().toEpochMilli()){
+        // println("[sghan] cpu util:," + (cpuConsumptionOf(busyPool)/2.0 * 3.0 + memoryConsumptionOf(busyPool)/2048.0 * 1.0) + ",time:," + Instant.now().toEpochMilli())
+        //println("[sghan] cpu util:," + cpuConsumptionOf(busyPool ++ freePool) + ",time:," + Instant.now().toEpochMilli())
+        past_stamp = Instant.now().toEpochMilli()
+      }
       prewarmedPool = prewarmedPool + (sender() -> data)
 
     // Container got removed
     case ContainerRemoved =>
+      if (past_stamp != Instant.now().toEpochMilli()){
+        // println("[sghan] cpu util:," + (cpuConsumptionOf(busyPool)/2.0 * 3.0 + memoryConsumptionOf(busyPool)/2048.0 * 1.0) + ",time:," + Instant.now().toEpochMilli())
+        //println("[sghan] cpu util:," + cpuConsumptionOf(busyPool ++ freePool) + ",time:," + Instant.now().toEpochMilli())
+        past_stamp = Instant.now().toEpochMilli()
+      }
       // if container was in free pool, it may have been processing (but under capacity),
       // so there is capacity to accept another job request
       freePool.get(sender()).foreach { f =>
@@ -290,6 +310,11 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
     // 3. The container aged and is destroying itself
     // Update the free/busy lists but no message is sent to the feed since there is no change in capacity yet
     case RescheduleJob =>
+      if (past_stamp != Instant.now().toEpochMilli()){
+        // println("[sghan] cpu util:," + (cpuConsumptionOf(busyPool)/2.0 * 3.0 + memoryConsumptionOf(busyPool)/2048.0 * 1.0) + ",time:," + Instant.now().toEpochMilli())
+        //println("[sghan] cpu util:," + cpuConsumptionOf(busyPool ++ freePool) + ",time:," + Instant.now().toEpochMilli())
+        past_stamp = Instant.now().toEpochMilli()
+      }
       freePool = freePool - sender()
       busyPool = busyPool - sender()
   }
@@ -379,7 +404,7 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         buffer_kvp.close
       }
       else {
-        cpu = 16.0
+        cpu = 2.0
       }
 
       // check total available memory
@@ -400,7 +425,7 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         buffer_kvp.close
       }
       else {
-        memory = 102400
+        memory = 2048
       }
   
       if(cpu != availCpu || memory != availMemory.toMB) {

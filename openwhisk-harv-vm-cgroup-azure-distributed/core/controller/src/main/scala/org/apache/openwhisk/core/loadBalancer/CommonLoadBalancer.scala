@@ -285,7 +285,7 @@ abstract class CommonLoadBalancer(config: WhiskConfig,
   protected[loadBalancer] val functionCpuTimeDistr = MMap[FullyQualifiedEntityName, Distribution]()
 
   // protected val cpuUtilNumCores: Int = 40
-  protected val cpuUtilNumCores: Int = 16
+  protected val cpuUtilNumCores: Int = 2
   protected val cpuUtilUpdatBatch: Int = 5
   protected val cpuUtilPercentile: Double = 0.75
   protected val cpuLimitPercentile: Double = 0.99
@@ -297,7 +297,7 @@ abstract class CommonLoadBalancer(config: WhiskConfig,
   protected val redundantRatio: Double = 1.5  // general over-provision ratio for cpu limit
   protected val provisionRatio: Double = 2.0  // cpu limit overprovision ratio for the 1st invocation of a function
   protected val randomGen = Random
-  protected val maxCpuLimit: Double = 4.0
+  protected val maxCpuLimit: Double = 2.0
   protected val minCpuLimit: Double = 1.0
 
   // exeTime and totalTime unit is ms

@@ -598,7 +598,6 @@ class ContainerProxy(
   def initializeAndRun(container: Container, job: Run, coldStartTime: Option[Interval] = None)(implicit tid: TransactionId): Future[WhiskActivation] = {
     // [pickme]
     logging.info(this, s"[pickme] initializing: ${ContainerProxy.initializing.next()}")
-
     val actionTimeout = job.action.limits.timeout.duration
     val (env, parameters) = ContainerProxy.partitionArguments(job.msg.content, job.msg.initArgs)
 
@@ -847,6 +846,8 @@ object ContainerProxy {
           Interval(job.msg.transid.meta.start, end).duration.toMillis.toJson)
       }
     }
+
+    //println("[sghan]CompletionMessage,"+Instant.now().toEpochMilli()+",tid:,"+job.msg.transid.toString)
 
     val initTime = {
       initInterval.map(initTime => Parameters(WhiskActivation.initTimeAnnotation, initTime.duration.toMillis.toJson))

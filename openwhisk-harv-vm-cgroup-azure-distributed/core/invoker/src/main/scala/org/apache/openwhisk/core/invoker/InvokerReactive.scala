@@ -472,7 +472,7 @@ class InvokerReactive(
       buffer_kvp.close
     }
     else {
-      cpu = 16
+      cpu = 2.0
     }
 
     // check total available memory
@@ -493,7 +493,7 @@ class InvokerReactive(
       buffer_kvp.close
     }
     else {
-      memory = 102400
+      memory = 2048
     }
     
     var rscFileExists: Boolean = true

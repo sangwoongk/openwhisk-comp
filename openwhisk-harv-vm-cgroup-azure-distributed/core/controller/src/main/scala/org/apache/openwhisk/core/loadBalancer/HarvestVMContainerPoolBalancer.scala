@@ -20,6 +20,8 @@ package org.apache.openwhisk.core.loadBalancer
 import akka.actor.ActorRef
 import akka.actor.ActorRefFactory
 // import java.util.concurrent.ThreadLocalRandom
+import scala.collection.mutable.ListBuffer
+//import java.time.Instant
 
 import akka.actor.{Actor, ActorSystem, Cancellable, Props}
 import akka.cluster.ClusterEvent._
@@ -584,6 +586,9 @@ object HarvestVMContainerPoolBalancer extends LoadBalancerProvider {
       // used to choose the least loaded invoker
       var loaded_score: Double = 0.0  // scored rsc (weighted sum of rsc and memory)
 
+      var searchSpace = new ListBuffer[Int]()
+      var searchSpaceLoaded = new ListBuffer[Int]()
+
       // for logging
       var chosen_invoker_avail_cpus: Double = 0.0
       var chosen_invoker_avail_mem: Long = 0
@@ -612,6 +617,7 @@ object HarvestVMContainerPoolBalancer extends LoadBalancerProvider {
         val this_invoker = invokers(nextIndex)
         val this_invoker_id = this_invoker.id.toInt
         nextIndex = (nextIndex + stepSize) % numInvokers
+        searchSpace += this_invoker_id
         // stop sending requests to unusable invoker and invoker with vm events scheduled
         if(this_invoker.status.isUsable && !this_invoker.vmEventScheduled) {
           // val (leftcpu, leftmem, score) = usedResources(this_invoker_id).reportLeftResources(
@@ -678,6 +684,8 @@ object HarvestVMContainerPoolBalancer extends LoadBalancerProvider {
       if(id_unloaded != -1) {
         usedResources(id_unloaded).forceAcquire(reqCpu, reqMemory, maxConcurrent, fqn)
         logging.warn(this, s"system underloaded. Choose invoker ${id_unloaded} (${invoker_id_unloaded.toInt}) leftcpu ${chosen_invoker_avail_cpus} leftmem ${chosen_invoker_avail_mem} score ${unloaded_score} nextInvokerSet ${nextInvokerSetSize} homeInvoker ${homeInvoker}.")
+        // println("[sghan] Select," + Instant.now().toEpochMilli()+",id," + invoker_id_unloaded.toInt + ",space," + searchSpace)
+
         Some(invoker_id_unloaded, false, nextInvokerSetSize)
       } else if(id_loaded == -1) {
         // no healthy invokers left
@@ -686,6 +694,8 @@ object HarvestVMContainerPoolBalancer extends LoadBalancerProvider {
       } else {
         usedResources(id_loaded).forceAcquire(reqCpu, reqMemory, maxConcurrent, fqn)
         logging.warn(this, s"system is overloaded. Choose invoker ${id_loaded} (${invoker_id_loaded.toInt}) leftcpu ${chosen_invoker_avail_cpus} leftmem ${chosen_invoker_avail_mem} score ${loaded_score} nextInvokerSet ${nextInvokerSetSize} homeInvoker ${homeInvoker}.")
+        // println("[sghan] Select," + Instant.now().toEpochMilli()+",id," + invoker_id_loaded.toInt + ",space," + searchSpace)
+
         Some(invoker_id_loaded, true, nextInvokerSetSize)
       }
       

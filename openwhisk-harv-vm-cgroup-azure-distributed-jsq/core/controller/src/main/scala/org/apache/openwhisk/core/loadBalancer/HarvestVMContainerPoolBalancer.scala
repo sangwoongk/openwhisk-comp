@@ -20,6 +20,8 @@ package org.apache.openwhisk.core.loadBalancer
 import akka.actor.ActorRef
 import akka.actor.ActorRefFactory
 // import java.util.concurrent.ThreadLocalRandom
+import scala.collection.mutable.ListBuffer
+//import java.time.{Instant}
 
 import akka.actor.{Actor, ActorSystem, Cancellable, Props}
 import akka.cluster.ClusterEvent._
@@ -309,6 +311,7 @@ class HarvestVMContainerPoolBalancer(
         cpuLimit, // used to check if an invoker can hold the container of the function
         action.limits.memory.megabytes,
         schedulingState.clusterSize)
+        //(msg.content.get.toString).split(",")(0).split(":")(1))
 
       invoker.foreach {
         case (_, true) =>
@@ -333,9 +336,11 @@ class HarvestVMContainerPoolBalancer(
         val memoryLimitInfo = if (memoryLimit == MemoryLimit()) { "std" } else { "non-std" }
         val timeLimit = action.limits.timeout
         val timeLimitInfo = if (timeLimit == TimeLimit()) { "std" } else { "non-std" }
+
         logging.info(
           this,
           s"scheduled activation ${msg.activationId}, action '${msg.action.asString}' ($actionType), ns '${msg.user.namespace.name.asString}', mem limit ${memoryLimit.megabytes} MB (${memoryLimitInfo}), time limit ${timeLimit.duration.toMillis} ms cpu limit ${msg.cpuLimit} cpu util ${cpuUtil} (${timeLimitInfo}) to ${invoker}")
+        //println("[sghan]SendMessage,"+Instant.now().toEpochMilli() + ",tid:,"+transid.toString+",invoker,"+ (msg.content.get.toString).split(",")(0).split(":")(1))
         val activationResult = setupActivation(msg, action, invoker, cpuUtil, updateCpuLimit)
         sendActivationToInvoker(messageProducer, msg, invoker).map(_ => activationResult)
       }
@@ -555,7 +560,9 @@ object HarvestVMContainerPoolBalancer extends LoadBalancerProvider {
     reqCpu: Double,
     cpuLimit: Double,
     reqMemory: Long,
-    clusterSize: Int)(implicit logging: Logging, transId: TransactionId): Option[(InvokerInstanceId, Boolean)] = {
+    clusterSize: Int)
+    //setInvoker: String)
+    (implicit logging: Logging, transId: TransactionId): Option[(InvokerInstanceId, Boolean)] = {
     val numInvokers = invokers.size
 
     if (numInvokers > 0) {
@@ -581,12 +588,16 @@ object HarvestVMContainerPoolBalancer extends LoadBalancerProvider {
       var loaded_score: Double = 0.0  // scored rsc (weighted sum of rsc and memory)
 
       // make sure that invoker's total rsc (cpu) must be greater than container's total resource
+      var searchSpace = new ListBuffer[Int]()
+      var searchSpaceLoaded = new ListBuffer[Int]()
+
       for(i <- 0 to invokers.size - 1) {
         val this_invoker = invokers(i)
         val this_invoker_id = this_invoker.id.toInt
+
         if(this_invoker.status.isUsable && this_invoker.cpu.toDouble >= cpuLimit) {
           val (leftcpu, leftmem, score) = usedResources(this_invoker_id).reportLeftResources(this_invoker.cpu.toDouble/clusterSize, this_invoker.memory/clusterSize, reqCpu, reqMemory, maxConcurrent, fqn)
-                
+          searchSpace += this_invoker_id      
           logging.warn(this, s"check invoker${this_invoker_id} leftcpu ${leftcpu} leftmem ${leftmem} score ${score}")
 
           if(leftcpu >= 0 && leftmem >= 0) {
@@ -616,6 +627,8 @@ object HarvestVMContainerPoolBalancer extends LoadBalancerProvider {
       if(id_unloaded != -1) {
         usedResources(id_unloaded).forceAcquire(reqCpu, reqMemory, maxConcurrent, fqn)
         logging.warn(this, s"system underloaded. Choose invoker ${id_unloaded} (${invoker_id_unloaded.toInt}) leftcpu ${unloaded_cpu_left} leftmem ${unloaded_mem_left} score ${unloaded_score}.")
+        //logging.warn(this, s"sghan")
+        // println("[sghan] Select," + Instant.now().toEpochMilli()+",id," + invoker_id_unloaded.toInt + ",space," + searchSpace)
         Some(invoker_id_unloaded, false)
       } else if(id_loaded == -1) {
         // no healthy invokers left
@@ -623,6 +636,7 @@ object HarvestVMContainerPoolBalancer extends LoadBalancerProvider {
         None
       } else {
         usedResources(id_loaded).forceAcquire(reqCpu, reqMemory, maxConcurrent, fqn)
+        // println("[sghan] Select," + Instant.now().toEpochMilli()+",id," + invoker_id_loaded.toInt + ",space," + searchSpace)
         logging.warn(this, s"system is overloaded. Choose invoker ${id_loaded} (${invoker_id_loaded.toInt}) leftcpu ${loaded_cpu_left} leftmem ${loaded_mem_left} score ${loaded_score}.")
         Some(invoker_id_loaded, true)
       }

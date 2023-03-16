@@ -231,6 +231,8 @@ class InvokerReactive(
         implicit val transid: TransactionId = msg.transid
         transid.meta.invokerStart = Option(Instant.now)
 
+        //println("[sghan]Initialize,"+Instant.now().toEpochMilli()+",tid:,"+transid.toString)
+
         //set trace context to continue tracing
         WhiskTracerProvider.tracer.setTraceContext(transid, msg.traceContext)
 
@@ -350,7 +352,7 @@ class InvokerReactive(
       buffer_kvp.close
     }
     else {
-      cpu = 16.0
+      cpu = 2.0
     }
 
     // check total available memory
@@ -371,7 +373,7 @@ class InvokerReactive(
       buffer_kvp.close
     }
     else {
-      memory = 102400
+      memory = 2048
     }
     
     healthProducer.send("health", PingMessage(instance, cpu, memory)).andThen {

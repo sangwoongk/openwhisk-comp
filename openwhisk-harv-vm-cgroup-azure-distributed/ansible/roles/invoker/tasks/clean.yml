@@ -19,10 +19,10 @@
 
 - name: get invoker name and index
   set_fact:
-    # invoker_name: "{{ name_prefix ~ ((invoker_index_base | int) + host_group.index(inventory_hostname)) }}"
-    # invoker_index: "{{ (invoker_index_base | int) + host_group.index(inventory_hostname) }}"
-    invoker_name: "{{ name_prefix ~ (invoker_ids[host_group.index(inventory_hostname)]) }}"
-    invoker_index: "{{ invoker_ids[host_group.index(inventory_hostname)] }}"
+    invoker_name: "{{ name_prefix ~ (0 + host_group.index(inventory_hostname)) }}"
+    invoker_index: "{{  host_group.index(inventory_hostname) }}"
+    #invoker_name: "{{ name_prefix ~ (invoker_ids[host_group.index(inventory_hostname)]) }}"
+    #invoker_index: "{{ invoker_ids[host_group.index(inventory_hostname)] }}"
 
 - name: remove invoker
   docker_container:

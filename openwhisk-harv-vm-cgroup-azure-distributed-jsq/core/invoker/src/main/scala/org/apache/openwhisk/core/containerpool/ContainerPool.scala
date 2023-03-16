@@ -379,7 +379,7 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         buffer_kvp.close
       }
       else {
-        cpu = 16.0
+        cpu = 2.0
       }
 
       // check total available memory
@@ -400,7 +400,7 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         buffer_kvp.close
       }
       else {
-        memory = 102400
+        memory = 2048
       }
   
       if(cpu != availCpu || memory != availMemory.toMB) {

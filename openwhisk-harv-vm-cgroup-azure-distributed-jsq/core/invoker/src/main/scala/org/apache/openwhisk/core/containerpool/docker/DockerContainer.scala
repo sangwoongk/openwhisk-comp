@@ -106,6 +106,9 @@ object DockerContainer {
       case (key, valueList) => valueList.toList.flatMap(Seq(key, _))
     }
 
+    val cpu_period: Long = 10000  // default period: 10 ms (10000 us)
+    val cpu_quota: Long = (cpus * cpu_period).toLong
+
     // change cpu to cpu groups
     // NOTE: --dns-option on modern versions of docker, but is --dns-opt on docker 1.12
     val dnsOptString = if (docker.clientVersion.startsWith("1.12")) { "--dns-opt" } else { "--dns-option" }
@@ -114,6 +117,10 @@ object DockerContainer {
       // cpuShares.toString,
       // "--cpus",
       // cpus.toString,
+      "--cpu-period",
+      cpu_period.toString,
+      "--cpu-quota",
+      cpu_quota.toString,
       // "--cgroup-parent",
       // "/cgroup_harvest_vm/",
       "--memory",

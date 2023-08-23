@@ -297,7 +297,7 @@ abstract class CommonLoadBalancer(config: WhiskConfig,
   protected val redundantRatio: Double = 1.5  // general over-provision ratio for cpu limit
   protected val provisionRatio: Double = 2.0  // cpu limit overprovision ratio for the 1st invocation of a function
   protected val randomGen = Random
-  protected val maxCpuLimit: Double = 4.0
+  protected val maxCpuLimit: Double = 2.0
   protected val minCpuLimit: Double = 1.0
 
   // exeTime and totalTime unit is ms

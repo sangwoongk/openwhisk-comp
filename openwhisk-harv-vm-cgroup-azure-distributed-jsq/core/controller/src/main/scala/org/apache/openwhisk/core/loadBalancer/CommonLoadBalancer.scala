@@ -85,6 +85,8 @@ abstract class CommonLoadBalancer(config: WhiskConfig,
   protected val cpuUtilWindow:Int = 50
   protected val redundantRatio: Double = 1.001
   protected val randomGen = Random
+  protected val maxCpuLimit: Double = 2.0
+  protected val minCpuLimit: Double = 1.0
 
   case class InvocationSample(actionId: FullyQualifiedEntityName, cpuUtil: Double, updateCpuLimit: Boolean)
   // use another process for proecssing data wrt function cpu util distribution
@@ -105,9 +107,9 @@ abstract class CommonLoadBalancer(config: WhiskConfig,
         else {
            val curr_limit = functionCpuLimit.getOrElse(sample.actionId, 0.0)
            if(curr_limit < estimated_limit)
-            functionCpuLimit.update(sample.actionId, math.min(estimated_limit, 4.0))
+            functionCpuLimit.update(sample.actionId, math.min(estimated_limit, maxCpuLimit))
            else if(cpu_limit < math.floor(curr_limit/(redundantRatio*redundantRatio)))
-            functionCpuLimit.update(sample.actionId, math.min(math.ceil(curr_limit/redundantRatio), 4.0) )
+            functionCpuLimit.update(sample.actionId, math.min(math.ceil(curr_limit/redundantRatio), maxCpuLimit))
         }
         logging.info(this, s"function ${sample.actionId.asString} raw_cpu_limit = ${cpu_limit} cpu_limit = ${functionCpuLimit.get(sample.actionId)}, cpu_usage = ${estimated_cpu}") 
     }

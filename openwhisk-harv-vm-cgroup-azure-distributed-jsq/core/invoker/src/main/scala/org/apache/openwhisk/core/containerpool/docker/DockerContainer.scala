@@ -106,8 +106,9 @@ object DockerContainer {
       case (key, valueList) => valueList.toList.flatMap(Seq(key, _))
     }
 
-    val cpu_period: Long = 10000  // default period: 10 ms (10000 us)
-    val cpu_quota: Long = (cpus * cpu_period).toLong
+    val cpu_period: Long = 100000  // default period: 100 ms (100000 us)
+    val vm_cpu_limit = 1  // pickme, fix cpu limit to 1.0
+    val cpu_quota: Long = (vm_cpu_limit * cpu_period).toLong
 
     // change cpu to cpu groups
     // NOTE: --dns-option on modern versions of docker, but is --dns-opt on docker 1.12

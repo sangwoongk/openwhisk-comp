@@ -1,5 +1,6 @@
 #!/bin/bash
 
+ansible-playbook -i environments/local setup.yml
 ansible-playbook -i environments/local couchdb.yml
 ansible-playbook -i environments/local initdb.yml
 ansible-playbook -i environments/local wipe.yml

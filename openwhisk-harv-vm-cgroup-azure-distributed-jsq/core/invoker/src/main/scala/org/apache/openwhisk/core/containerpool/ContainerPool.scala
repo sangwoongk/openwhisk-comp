@@ -117,7 +117,13 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
     case r: Run =>
       // Check if the message is resent from the buffer. Only the first message on the buffer can be resent.
       val isResentFromBuffer = runBuffer.nonEmpty && runBuffer.dequeueOption.exists(_._1.msg == r.msg)
-
+      r.msg.transid.meta.queueLen = Option(runBuffer.length)
+      /*
+      if (past_stamp != Instant.now().toEpochMilli()){
+        println("[sghan] cpu util:," + (cpuConsumptionOf(busyPool)/2.0 * 3.0 + memoryConsumptionOf(busyPool)/2048.0 * 1.0) + ",time:," + Instant.now().toEpochMilli())
+        past_stamp = Instant.now().toEpochMilli() 
+      }
+      */
       // yanqi, use estimated cpu usage
       var cpuLimit = r.msg.cpuLimit
       var cpuUtil  = r.msg.cpuUtil

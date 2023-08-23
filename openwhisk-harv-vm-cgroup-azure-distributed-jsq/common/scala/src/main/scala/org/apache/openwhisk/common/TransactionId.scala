@@ -197,7 +197,9 @@ case class StartMarker(start: Instant, startMarker: LogMarkerToken)
  * @param start the timestamp when the request processing commenced
  * @param extraLogging enables logging, if set to true
  */
-protected case class TransactionMetadata(id: String, start: Instant, extraLogging: Boolean = false, var invokerStart: Option[Instant] = None)
+protected case class TransactionMetadata(id: String, start: Instant, extraLogging: Boolean = false,
+                                          var invokerStart: Option[Instant] = None,
+                                          var queueLen: Option[Int] = None)
 
 case class MetricConfig(prometheusEnabled: Boolean,
                         kamonEnabled: Boolean,

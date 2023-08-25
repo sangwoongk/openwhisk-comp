@@ -287,7 +287,7 @@ class ContainerProxy(
       activeCount += 1
       // pickme
       val createStart = Instant.now
-      logging.info(this ,s"[pickme] creating: ${ContainerProxy.creating.next()}")
+      // logging.info(this ,s"[pickme] creating: ${ContainerProxy.creating.next()}")
 
       // create a new container
       // yanqi, add cpus constraint on docker
@@ -344,7 +344,7 @@ class ContainerProxy(
         }
         .flatMap { container =>
           val createEnd = Instant.now
-          ContainerProxy.creating.prev()
+          // ContainerProxy.creating.prev()
           // now attempt to inject the user code and run the action
           initializeAndRun(container, job, Option(Interval(createStart, createEnd)))  // [pickme] add interval
             .map(_ => RunCompleted)
@@ -597,7 +597,7 @@ class ContainerProxy(
    */
   def initializeAndRun(container: Container, job: Run, coldStartTime: Option[Interval] = None)(implicit tid: TransactionId): Future[WhiskActivation] = {
     // [pickme]
-    logging.info(this, s"[pickme] initializing: ${ContainerProxy.initializing.next()}")
+    // logging.info(this, s"[pickme] initializing: ${ContainerProxy.initializing.next()}")
 
     val actionTimeout = job.action.limits.timeout.duration
     val (env, parameters) = ContainerProxy.partitionArguments(job.msg.content, job.msg.initArgs)
@@ -656,7 +656,7 @@ class ContainerProxy(
           "deadline" -> (Instant.now.toEpochMilli + actionTimeout.toMillis).toString.toJson)
 
         // [pickme]
-        ContainerProxy.initializing.prev()
+        // ContainerProxy.initializing.prev()
 
         container
           .run(
@@ -795,8 +795,8 @@ object ContainerProxy {
   // Needs to be thread-safe as it's used by multiple proxies concurrently.
   private val containerCount = new Counter
   // [pickme debug]
-  private val initializing = new Counter
-  private val creating = new Counter
+  // private val initializing = new Counter
+  // private val creating = new Counter
 
   val timeouts = loadConfigOrThrow[ContainerProxyTimeoutConfig](ConfigKeys.containerProxyTimeouts)
 

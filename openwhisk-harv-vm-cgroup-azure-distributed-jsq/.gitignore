@@ -101,3 +101,5 @@ core/routemgmt/getApi/package-lock.json
 core/routemgmt/getApi/utils.js
 
 wsk
+debug_logs/
+command_to_vm.sh

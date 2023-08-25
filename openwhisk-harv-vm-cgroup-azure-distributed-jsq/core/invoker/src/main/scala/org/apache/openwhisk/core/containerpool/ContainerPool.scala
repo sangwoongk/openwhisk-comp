@@ -72,20 +72,72 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
 
   // map fo function cpu utilization, used for cpu admission control
   var overSubscribedRate: Double = 1.5
+  // var overSubscribedRate: Double = 0.9
 
   var availMemory: ByteSize = poolConfig.userMemory
-  var availCpu: Double = 1.0
+  var availCpu: Double = 2.0
   // If all memory slots are occupied and if there is currently no container to be removed, than the actions will be
   // buffered here to keep order of computation.
   // Otherwise actions with small memory-limits could block actions with large memory limits.
   var runBuffer = immutable.Queue.empty[Run]
+  // Track the resent buffer head - so that we don't resend buffer head multiple times
+  var resent: Option[Run] = None
   val logMessageInterval = 10.seconds
 
   // yanqi, make invoker check its resources periodically
   val resourceCheckInterval: Long = 1000 // check resource every 1000ms
-  var prevCheckTime: Long = 0 
+  var prevCheckTime: Long = 0   // in ms
+  var cgroupCheckTime: Long = 0   // in ns
   val coreNumPath = "/hypervkvp/.kvp_pool_0"
   val memoryMBPath = "/hypervkvp/.kvp_pool_2"
+  val cgroupCpuPath = "/sys/fs/cgroup/cpuacct/cpuacct.usage"
+  val cgroupMemPath = "/sys/fs/cgroup/memory/memory.stat"
+  var cgroupCpuTime: Long = 0 // in ns
+  var cgroupCpuUsage: Double = 0.0  // virtual cpus
+  var cgroupMemUsage: Long = 0  // in mb
+  var cgroupWindowSize: Int = 5
+  // (cpu, mem) tuples
+  var cgroupWindow: Array[(Double, Long)] = Array.fill(cgroupWindowSize)((-1.0, -1: Long))
+  var cgroupWindowPtr: Int = 0
+
+  def get_mean_rsc_usage(): (Double, Long) = {
+    var samples: Int = 0
+    var sum_cpu: Double = 0
+    var sum_mem: Long = 0
+    var i: Int = 0
+    while(i < cgroupWindowSize) {
+      if(cgroupWindow(i)._1 >= 0 && cgroupWindow(i)._2 >= 0) {
+        samples = samples + 1
+        sum_cpu = sum_cpu + cgroupWindow(i)._1
+        sum_mem = sum_mem + cgroupWindow(i)._2
+      }
+      i = i + 1
+    }
+    (sum_cpu/samples, sum_mem/samples)
+  }
+
+  def get_max_rsc_usage(): (Double, Long) = {
+    var max_cpu: Double = 0
+    var max_mem: Long = 0
+    var i: Int = 0
+    while(i < cgroupWindowSize) {
+      if(cgroupWindow(i)._1 > max_cpu ) {
+        max_cpu = cgroupWindow(i)._1
+      }
+      if(cgroupWindow(i)._2 > max_mem) {
+        max_mem = cgroupWindow(i)._2
+      }
+      i = i + 1
+    }
+    (max_cpu, max_mem)
+  }
+
+  def proceed_cgroup_window_ptr() {
+    cgroupWindowPtr = cgroupWindowPtr + 1
+    if(cgroupWindowPtr >= cgroupWindowSize) {
+      cgroupWindowPtr = 0
+    }
+  }
 
   prewarmConfig.foreach { config =>
     logging.info(this, s"pre-warming ${config.count} ${config.exec.kind} ${config.cpuLimit.toString} ${config.memoryLimit.toString}")(
@@ -132,14 +184,19 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
       if(cpuUtil <= 0)
         cpuUtil = r.action.limits.cpu.cores
 
-      logging.info(this, s"cpuLimit: ${cpuLimit}, cpuUtil: ${cpuUtil}, originLimit: ${r.action.limits.cpu.cores}, originUtil: ${r.action.limits.cpu.cores}")
+      logging.info(this, s"action: ${r.action.name}, cpuLimit: ${cpuLimit}, cpuUtil: ${cpuUtil}, originLimit: ${r.action.limits.cpu.cores}, originUtil: ${r.action.limits.cpu.cores}")
       // Only process request, if there are no other requests waiting for free slots, or if the current request is the
       // next request to process
       // It is guaranteed, that only the first message on the buffer is resent.
       if (runBuffer.isEmpty || isResentFromBuffer) {
+        if (isResentFromBuffer) {
+          resent = None
+        }
+        logging.info(this, s"runBuffer.isEmpty: ${runBuffer.isEmpty}, isResentFromBuffer: ${isResentFromBuffer}")
         val createdContainer =
           // Is there enough space on the invoker for this action to be executed.
-          if (hasPoolSpaceFor(busyPool, r.action.limits.memory.megabytes.MB, cpuUtil)) {
+          // if (hasPoolSpaceFor(busyPool, r.action.limits.memory.megabytes.MB, cpuUtil)) {
+          if (hasSpaceFor(r.action.limits.memory.megabytes.MB)) {
             // Schedule a job to a warm container
             ContainerPool
               .schedule(r.action, r.msg.user.namespace.name, freePool, cpuLimit, cpuUtil)
@@ -148,7 +205,9 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
                 // There was no warm/warming/warmingCold container. Try to take a prewarm container or a cold container.
     
                 // Is there enough space to create a new container or do other containers have to be removed?
-                if (hasPoolSpaceFor(busyPool ++ freePool, r.action.limits.memory.megabytes.MB, cpuUtil)) {
+                // if (hasPoolSpaceFor(busyPool ++ freePool, r.action.limits.memory.megabytes.MB, cpuUtil)) {
+                // yanqi, only look at freePool here since we estimate the mem usage of busyPool with cgroup
+                if (hasPoolSpaceFor(freePool, r.action.limits.memory.megabytes.MB, availMemory.toMB - cgroupMemUsage)) {
                   takePrewarmContainer(r.action, cpuLimit, cpuUtil)
                     .map(container => (container, "prewarmed"))
                     .orElse(Some(createContainer(r.action.limits.memory.megabytes.MB), "cold")) // yanqi, use estimated cpu usage
@@ -159,7 +218,7 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
                 ContainerPool
                 // Only free up the amount, that is really needed to free up & add cpu accouting. yanqi
                   // .remove(freePool, Math.min(r.action.limits.memory.megabytes, memoryConsumptionOf(freePool)).MB)
-                  .remove(freePool, Math.min(r.action.limits.memory.megabytes, memoryConsumptionOf(freePool)).MB, Math.min(cpuUtil, cpuConsumptionOf(freePool)))
+                  .remove(freePool, Math.min(r.action.limits.memory.megabytes, memoryConsumptionOf(freePool)).MB)
                   .map(removeContainer)
                   // If the list had at least one entry, enough containers were removed to start the new container. After
                   // removing the containers, we are not interested anymore in the containers that have been removed.
@@ -205,7 +264,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
               // from the buffer
               val (_, newBuffer) = runBuffer.dequeue
               runBuffer = newBuffer
-              runBuffer.dequeueOption.foreach { case (run, _) => self ! run }
+              // runBuffer.dequeueOption.foreach { case (run, _) => self ! run }
+              processBufferOrFeed()
             }
             actor ! r // forwards the run request to the container
             logContainerStart(r, containerState, newData.activeActivationCount, container)
@@ -222,6 +282,9 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
                   s"freePoolSize: ${freePool.size} containers and ${memoryConsumptionOf(freePool)} MB, ${cpuConsumptionOf(freePool)} cpus, " +
                   s"busyPoolSize: ${busyPool.size} containers and ${memoryConsumptionOf(busyPool)} MB, ${cpuConsumptionOf(busyPool)} cpus " +
                   // s"maxContainersMemory ${poolConfig.userMemory.toMB} MB, " +
+                  s"mean_cgroupCpuUsage ${get_mean_rsc_usage()._1}, " +
+                  s"mean_cgroupMemUsage ${get_mean_rsc_usage()._2} MB , " +
+                  s"max_cgroupMemUsage ${get_max_rsc_usage()._2} MB , " +
                   s"maxContainersMemory ${availMemory.toMB} MB , " +
                   s"maxContainersCpu ${availCpu} , " +
                   s"userNamespace: ${r.msg.user.namespace.name}, action: ${r.action}, " +
@@ -300,6 +363,23 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
       busyPool = busyPool - sender()
   }
 
+  def processBufferOrFeed() = {
+    runBuffer.dequeueOption match {
+      case Some((run, _)) => // run the first from buffer
+        implicit val tid = run.msg.transid
+
+        if (resent.isEmpty) {
+          logging.info(this, s"re-processing from buffer (${runBuffer.length}) items in buffer")
+          resent = Some(run)
+          self ! run
+        } else {
+          //do not resend the buffer head multiple times (may reach this point from multiple messages, before the buffer head is re-processed)
+        }
+      case None =>
+        feed ! MessageFeed.Processed
+    }
+  }
+
   /** Creates a new container and updates state accordingly. */
   def createContainer(memoryLimit: ByteSize): (ActorRef, ContainerData) = {
     val ref = childFactory(context)
@@ -351,22 +431,35 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
     busyPool = busyPool - toDelete
   }
 
+
   /**
    * Calculate if there is enough free memory within a given pool.
    *
    * @param pool The pool, that has to be checked, if there is enough free memory.
    * @param memory The amount of memory to check.
-   * @param cpu utilization (not limit) for the invocation
    * @return true, if there is enough space for the given amount of memory.
    */
-  def hasPoolSpaceFor[A](pool: Map[A, ContainerData], memory: ByteSize, cpuUtil: Double): Boolean = {
+  def hasPoolSpaceFor[A](pool: Map[A, ContainerData], memory: ByteSize, freeMemory: Long): Boolean = {
+    logging.info(this, s"[hasPoolSpaceFor] memoryConsumption: ${memoryConsumptionOf(pool)}, memory: ${memory.toMB}, freeMemory: ${freeMemory}")
+    memoryConsumptionOf(pool) + memory.toMB <= freeMemory
+  }
+
+  /**
+   * Calculate if there is enough free memory within a given pool.
+   *
+   * @param memory The amount of memory to check.
+   * @param cpu usage (not limit) for the invocation
+   * @return true, if there is enough space for the given amount of memory.
+   */
+  // def hasSpaceFor[A](pool: Map[A, ContainerData], memory: ByteSize, cpuUtil: Double): Boolean = {
+  def hasSpaceFor[A](memory: ByteSize): Boolean = {
     // yanqi, add periodic check of available resources
     val curms: Long = System.currentTimeMillis()
     if(curms - prevCheckTime >= resourceCheckInterval) {
+      prevCheckTime = curms
       var cpu: Double = 1.0
       var memory: Long = 2048
 
-      prevCheckTime = curms
       // check total available cpus
       if(Files.exists(Paths.get(coreNumPath))) {
         val buffer_kvp = Source.fromFile(coreNumPath)
@@ -406,7 +499,7 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         buffer_kvp.close
       }
       else {
-        memory = 2048
+        memory = 2560
       }
   
       if(cpu != availCpu || memory != availMemory.toMB) {
@@ -414,14 +507,79 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         availMemory = ByteSize(memory, SizeUnits.MB)
         logging.warn(this, s"memory changed to ${memory}MB, cpu changed to ${availCpu}")
       }
+
+      var rscFileExists: Boolean = true
+      // check cpu usage of cgroup
+      if(Files.exists(Paths.get(cgroupCpuPath))) {
+        val buffer_cgroup_cpu = Source.fromFile(cgroupCpuPath)
+        val lines_cgroup = buffer_cgroup_cpu.getLines.toArray
+        var cpu_time: Long = 0
+        if(lines_cgroup.size == 1) {
+          cpu_time = lines_cgroup(0).toLong
+        }
+        if(cgroupCheckTime == 0) {
+          cgroupCheckTime = System.nanoTime
+          cgroupCpuTime = cpu_time
+        } else {
+          var curns: Long = System.nanoTime
+          // update
+          cgroupCpuUsage = ((cpu_time - cgroupCpuTime).toDouble / (curns - cgroupCheckTime))
+          cgroupCpuUsage = (cgroupCpuUsage * 1000).toInt/1000.0
+
+          cgroupCheckTime = curns
+          cgroupCpuTime = cpu_time
+        }
+        buffer_cgroup_cpu.close
+      } else {
+        logging.warn(this, s"${cgroupCpuPath} does not exist")
+        rscFileExists = false
+      }
+
+      // check actual memory usage
+      if(Files.exists(Paths.get(cgroupMemPath))) {
+        val buffer_cgroup_mem = Source.fromFile(cgroupMemPath)
+        val lines_cgroup = buffer_cgroup_mem.getLines.toArray
+        var mem_usage: Long = 0  
+
+        var total_cache: Long = 0
+        var total_rss: Long = 0
+
+        for(line <- lines_cgroup) {
+          if(line.contains("total_cache")) {
+            total_cache = line.split(" ")(1).toLong/(1024*1024)
+          } else if(line.contains("total_rss")) {
+            total_rss = line.split(" ")(1).toLong/(1024*1024)
+          }
+        }
+        buffer_cgroup_mem.close
+        cgroupMemUsage = total_cache + total_rss
+      } else {
+        logging.warn(this, s"${cgroupMemPath} does not exist")
+        rscFileExists = false
+      }
+
+      if(rscFileExists) {
+        cgroupWindow(cgroupWindowPtr) = (cgroupCpuUsage, cgroupMemUsage)
+        proceed_cgroup_window_ptr()
+        val (mean_cpu_usage, mean_mem_usage) = get_mean_rsc_usage()
+        logging.info(this, s"Invoker cgroupCpuUsage, cgroupMemUsage = ${cgroupCpuUsage}, ${cgroupMemUsage}")
+        logging.info(this, s"Invoker mean_cgroupCpuUsage, mean_cgroupMemUsage = ${mean_cpu_usage}, ${mean_mem_usage}")
+      }
     }
 
     // debug only
     // pool.map(k => logging.warn(this, s"pool container data activeActivations ${k._2.activeActivationCount}, cpuUtil ${k._2.cpuUtil}, cpuLimit ${k._2.cpuLimit}"))
     // logging.warn(this, s"cpu consumption ${cpuConsumptionOf(pool) + cpuUtil}, total cpu ${availCpu}, enough rsc ${memoryConsumptionOf(pool) + memory.toMB <= availMemory.toMB && cpuConsumptionOf(pool) + cpuUtil <= availCpu*overSubscribedRate}")
 
+    val (mean_cpu_usage, mean_mem_usage) = get_mean_rsc_usage()
+    val (max_cpu_usage, max_mem_usage) = get_max_rsc_usage()
+
+    logging.info(this, s"[hasSpaceFor] max_mem_usage: ${max_mem_usage}, memory: ${memory.toMB}, availMemory: ${availMemory.toMB}, " +
+      s"max_cpu_usage: ${max_cpu_usage}, availCpu: ${availCpu}, result: ${max_mem_usage + memory.toMB <= availMemory.toMB && max_cpu_usage <= availCpu*overSubscribedRate}")
+
     // memoryConsumptionOf(pool) + memory.toMB <= poolConfig.userMemory.toMB
-    memoryConsumptionOf(pool) + memory.toMB <= availMemory.toMB && cpuConsumptionOf(pool) + cpuUtil <= availCpu*overSubscribedRate
+    // memoryConsumptionOf(pool) + memory.toMB <= availMemory.toMB && cpuConsumptionOf(pool) + cpuUtil <= availCpu*overSubscribedRate
+    max_mem_usage + memory.toMB <= availMemory.toMB && max_cpu_usage <= availCpu*overSubscribedRate
   }
 }
 
@@ -491,7 +649,10 @@ object ContainerPool {
       }
   }
 
-  // yanqi, add removing container wrt cpu (utilizaiton)
+  // yanqi, add removing container wrt cpu (utilizaiton) - prev jsq
+  // yanqi, we don't consider cpu usage when removing containers
+  // since we are only removing free containers that are currently idle
+  // removing these idle containers doesn't increase available capacity
   /**
    * Finds the oldest previously used container to remove to make space for the job passed to run.
    * Depending on the space that has to be allocated, several containers might be removed.
@@ -506,7 +667,7 @@ object ContainerPool {
   @tailrec
   protected[containerpool] def remove[A](pool: Map[A, ContainerData],
                                          memory: ByteSize,
-                                         cpu: Double,
+                                        //  cpu: Double,
                                          toRemove: List[A] = List.empty): List[A] = {
     // Try to find a Free container that does NOT have any active activations AND is initialized with any OTHER action
     val freeContainers = pool.collect {
@@ -515,7 +676,8 @@ object ContainerPool {
         ref -> w
     }
 
-    if (memory > 0.B && cpu > 0 && freeContainers.nonEmpty && memoryConsumptionOf(freeContainers) >= memory.toMB) {
+    // if (memory > 0.B && cpu > 0 && freeContainers.nonEmpty && memoryConsumptionOf(freeContainers) >= memory.toMB) {
+    if (memory > 0.B && freeContainers.nonEmpty && memoryConsumptionOf(freeContainers) >= memory.toMB) {
       // Remove the oldest container if:
       // - there is more memory required
       // - there are still containers that can be removed
@@ -523,8 +685,9 @@ object ContainerPool {
       val (ref, data) = freeContainers.minBy(_._2.lastUsed)
       // Catch exception if remaining memory will be negative
       val remainingMemory = Try(memory - data.memoryLimit).getOrElse(0.B)
-      var remainingCpu = Math.max(cpu - data.cpuUtil, 0)
-      remove(freeContainers - ref, remainingMemory, cpu, toRemove ++ List(ref))
+      // var remainingCpu = Math.max(cpu - data.cpuUtil, 0)
+      // remove(freeContainers - ref, remainingMemory, cpu, toRemove ++ List(ref))
+      remove(freeContainers - ref, remainingMemory, toRemove ++ List(ref))
     } else {
       // If this is the first call: All containers are in use currently, or there is more memory needed than
       // containers can be removed.

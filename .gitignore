@@ -2,3 +2,4 @@
 .vscode/
 .scala-build/
 openwhisk-catalog/
+openwhisk-comp.code-workspace

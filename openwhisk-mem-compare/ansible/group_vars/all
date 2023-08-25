@@ -191,7 +191,7 @@ invoker:
   port: 12001
   heap: "{{ invoker_heap | default('2g') }}"
   arguments: "{{ invoker_arguments | default('') }}"
-  userMemory: "{{ invoker_user_memory | default('131072m') }}"
+  userMemory: "{{ invoker_user_memory | default('2048m') }}"
   # Specify if it is allowed to deploy more than 1 invoker on a single machine.
   allowMultipleInstances: "{{ invoker_allow_multiple_instances | default(false) }}"
   # Specify if it should use docker-runc or docker to pause/unpause containers
@@ -363,7 +363,7 @@ catalog_repos:
 
 openwhisk_cli_tag: "{{ cli_tag | default(lookup('ini', 'git_tag section=openwhisk-cli file=' ~ openwhisk_home ~ '/ansible/files/package-versions.ini')) }}"
 openwhisk_cli:
-  installation_mode: "{{ cli_installation_mode | default(lookup('env', 'OPENWHISK_CLI_MODE')) | default('remote', true) }}"
+  installation_mode: "{{ cli_installation_mode | default(lookup('env', 'OPENWHISK_CLI_MODE')) | default('local', true) }}"
   archive_name: OpenWhisk_CLI
   nginxdir:
     name: "{{ nginx.confdir }}/cli/go/download"

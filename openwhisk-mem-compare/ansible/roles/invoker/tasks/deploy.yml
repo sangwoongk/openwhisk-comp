@@ -366,7 +366,7 @@
 
 - name: wait until Invoker is up and running
   uri:
-    url: "{{ invoker.protocol }}://{{ ansible_host }}:{{ invoker.port + (invoker_index | int) }}/ping"
+    url: "{{ invoker.protocol }}://{{ vm_ip }}:{{ invoker.port + (invoker_index | int) }}/ping"
     validate_certs: "no"
     client_key: "{{ invoker.confdir }}/{{ invoker_name }}/{{ invoker.ssl.key }}"
     client_cert: "{{ invoker.confdir }}/{{ invoker_name }}/{{ invoker.ssl.cert }}"

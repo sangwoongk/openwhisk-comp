@@ -103,3 +103,4 @@ core/routemgmt/getApi/utils.js
 
 wsk
 ansible/command_to_vm.sh
+ansible/debug_logs

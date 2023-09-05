@@ -71,7 +71,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
   var prewarmedPool = immutable.Map.empty[ActorRef, ContainerData]
 
   // map fo function cpu utilization, used for cpu admission control
-  var overSubscribedRate: Double = 0.9
+  // var overSubscribedRate: Double = 0.9
+  var overSubscribedRate: Double = 1.0
 
   var availMemory: ByteSize = poolConfig.userMemory
   var availCpu: Double = 10.0
@@ -96,6 +97,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
   // (cpu, mem) tuples
   var cgroupWindow: Array[(Double, Long)] = Array.fill(cgroupWindowSize)((-1.0, -1: Long))
   var cgroupWindowPtr: Int = 0
+
+  val overSubscribedRatePath = "/overSubscribedRate"
 
   def get_mean_rsc_usage(): (Double, Long) = {
     var samples: Int = 0
@@ -225,6 +228,7 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
 
       // // debug
       // logging.warn(this, s"receive Run cpu util ${cpuUtil}, cpu limit ${cpuLimit}")
+      logging.info(this, s"action: ${r.action.name}, cpuLimit: ${cpuLimit}, cpuUtil: ${cpuUtil}, originLimit: ${r.action.limits      .cpu.cores}, originUtil: ${r.action.limits.cpu.cores}")
 
       // Only process request, if there are no other requests waiting for free slots, or if the current request is the
       // next request to process
@@ -461,6 +465,7 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
    * @return true, if there is enough space for the given amount of memory.
    */
   def hasPoolSpaceFor[A](pool: Map[A, ContainerData], memory: ByteSize, freeMemory: Long): Boolean = {
+    logging.info(this, s"[hasPoolSpaceFor] memoryConsumption: ${memoryConsumptionOf(pool)}, memory: ${memory.toMB}, freeMemory: ${freeMemory}")
     memoryConsumptionOf(pool) + memory.toMB <= freeMemory
   }
 
@@ -475,6 +480,7 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
   def hasSpaceFor[A](memory: ByteSize): Boolean = {
     // yanqi, add periodic check of available resources
     val curms: Long = System.currentTimeMillis()
+
     if(curms - prevCheckTime >= resourceCheckInterval) {
       prevCheckTime = curms
       var cpu: Double = 1.0
@@ -585,10 +591,23 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         logging.info(this, s"Invoker cgroupCpuUsage, cgroupMemUsage = ${cgroupCpuUsage}, ${cgroupMemUsage}")
         logging.info(this, s"Invoker mean_cgroupCpuUsage, mean_cgroupMemUsage = ${mean_cpu_usage}, ${mean_mem_usage}")
       }
+
+      // pickme, add periodic check of overSubscribedRate
+      if(Files.exists(Paths.get(overSubscribedRatePath))) {
+        val buffer_oversub = Source.fromFile(overSubscribedRatePath)
+        val lines_oversub = buffer_oversub.getLines.toArray
+
+        if(lines_oversub.size == 1) {
+          overSubscribedRate = lines_oversub(0).toDouble
+        }
+      }
     }
 
     val (mean_cpu_usage, mean_mem_usage) = get_mean_rsc_usage()
     val (max_cpu_usage, max_mem_usage) = get_max_rsc_usage()
+    logging.info(this, s"[hasSpaceFor] max_mem_usage: ${max_mem_usage}, memory: ${memory}, availMemory: ${availMemory.toMB}, " +
+      s"max_cpu_usage: ${max_cpu_usage}, availCpu: ${availCpu}, overSubscribedRate: ${overSubscribedRate} " +
+      s"result: ${max_mem_usage + memory.toMB <= availMemory.toMB && max_cpu_usage <= availCpu*overSubscribedRate}")
 
     // max_mem_usage + memory.toMB <= availMemory.toMB && mean_cpu_usage + cpuUtil <= availCpu*overSubscribedRate
     max_mem_usage + memory.toMB <= availMemory.toMB && max_cpu_usage <= availCpu*overSubscribedRate

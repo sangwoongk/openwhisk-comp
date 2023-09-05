@@ -71,7 +71,7 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
   var prewarmedPool = immutable.Map.empty[ActorRef, ContainerData]
 
   // map fo function cpu utilization, used for cpu admission control
-  var overSubscribedRate: Double = 1.5
+  var overSubscribedRate: Double = 1.0
   // var overSubscribedRate: Double = 0.9
 
   var availMemory: ByteSize = poolConfig.userMemory
@@ -99,6 +99,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
   // (cpu, mem) tuples
   var cgroupWindow: Array[(Double, Long)] = Array.fill(cgroupWindowSize)((-1.0, -1: Long))
   var cgroupWindowPtr: Int = 0
+
+  val overSubscribedRatePath = "/overSubscribedRate"
 
   def get_mean_rsc_usage(): (Double, Long) = {
     var samples: Int = 0
@@ -499,7 +501,7 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         buffer_kvp.close
       }
       else {
-        memory = 2560
+        memory = 2048
       }
   
       if(cpu != availCpu || memory != availMemory.toMB) {
@@ -565,6 +567,15 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         logging.info(this, s"Invoker cgroupCpuUsage, cgroupMemUsage = ${cgroupCpuUsage}, ${cgroupMemUsage}")
         logging.info(this, s"Invoker mean_cgroupCpuUsage, mean_cgroupMemUsage = ${mean_cpu_usage}, ${mean_mem_usage}")
       }
+
+      if(Files.exists(Paths.get(overSubscribedRatePath))) {
+        val buffer_oversub = Source.fromFile(overSubscribedRatePath)
+        val lines_oversub = buffer_oversub.getLines.toArray
+
+        if(lines_oversub.size == 1) {
+          overSubscribedRate = lines_oversub(0).toDouble
+        }
+      }
     }
 
     // debug only
@@ -575,7 +586,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
     val (max_cpu_usage, max_mem_usage) = get_max_rsc_usage()
 
     logging.info(this, s"[hasSpaceFor] max_mem_usage: ${max_mem_usage}, memory: ${memory.toMB}, availMemory: ${availMemory.toMB}, " +
-      s"max_cpu_usage: ${max_cpu_usage}, availCpu: ${availCpu}, result: ${max_mem_usage + memory.toMB <= availMemory.toMB && max_cpu_usage <= availCpu*overSubscribedRate}")
+      s"max_cpu_usage: ${max_cpu_usage}, availCpu: ${availCpu}, overSubscribedRate: ${overSubscribedRate} " +
+      s"result: ${max_mem_usage + memory.toMB <= availMemory.toMB && max_cpu_usage <= availCpu*overSubscribedRate}")
 
     // memoryConsumptionOf(pool) + memory.toMB <= poolConfig.userMemory.toMB
     // memoryConsumptionOf(pool) + memory.toMB <= availMemory.toMB && cpuConsumptionOf(pool) + cpuUtil <= availCpu*overSubscribedRate

@@ -243,9 +243,9 @@ class InvokerPool(childFactory: (ActorRefFactory, InvokerInstanceId) => ActorRef
   def logStatus(stateTransit: Boolean, invokerId: Int, becomeUsable: Boolean): Unit = {
     monitor.foreach(_ ! CurrentInvokerPoolState(status, stateTransit, invokerId, becomeUsable))
     // yanqi, add rsc to logs
-    val statusNonOffline = status.filter(_.status.asString != "down")
-    val pretty = statusNonOffline.map(i => s"${i.id.toInt} -> ${i.status} cpu:${i.cpu} memory:${i.memory}MB cpuUsage:${i.cpuUsage} memUsage:${i.memUsage}MB vmEventScheduled:${i.vmEventScheduled}")
-    logging.info(this, s"invoker (non-offline) status changed to ${pretty.mkString(", ")}")
+    // val statusNonOffline = status.filter(_.status.asString != "down")
+    // val pretty = statusNonOffline.map(i => s"${i.id.toInt} -> ${i.status} cpu:${i.cpu} memory:${i.memory}MB cpuUsage:${i.cpuUsage} memUsage:${i.memUsage}MB vmEventScheduled:${i.vmEventScheduled}")
+    // logging.info(this, s"invoker (non-offline) status changed to ${pretty.mkString(", ")}")
   }
 
   /** Receive Ping messages from invokers. */

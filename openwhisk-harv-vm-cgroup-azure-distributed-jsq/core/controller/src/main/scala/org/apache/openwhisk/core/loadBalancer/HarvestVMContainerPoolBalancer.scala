@@ -847,7 +847,8 @@ case class HarvestVMContainerPoolBalancerState(
   // protected[loadBalancer] var _invokerSlots: IndexedSeq[NestedSemaphore[FullyQualifiedEntityName]] =
   //   IndexedSeq.empty[NestedSemaphore[FullyQualifiedEntityName]],
   // for scoring nodes
-  protected val _cpuCoeff: Double = 3.0,
+  // protected val _cpuCoeff: Double = 3.0,
+  protected val _cpuCoeff: Double = 1.0,  // pickme
   protected val _memCoeff: Double = 1.0,
   private var _clusterSize: Int = 1)(
   lbConfig: HarvestVMContainerPoolBalancerConfig =

@@ -207,8 +207,10 @@ class HarvestVMContainerPoolBalancer(
     MetricEmitter.emitGaugeMetric(OFFLINE_INVOKER_BLACKBOX, schedulingState.blackboxInvokers.count(_.status == Offline))
   }
 
-  val maxCpuUtil: Double = 0.7
-  val maxMemUtil: Double = 0.7
+  val maxCpuUtil: Double = 1.0
+  val maxMemUtil: Double = 1.0
+  // val maxCpuUtil: Double = 0.7
+  // val maxMemUtil: Double = 0.7
   // maxInvokerId is defined in CommonLoadBalancer (for consistent hashing)
 
   /** State needed for scheduling. */
@@ -520,6 +522,7 @@ object HarvestVMContainerPoolBalancer extends LoadBalancerProvider {
     })
 
   protected val cpuCoeff: Double = 1.0
+  // protected val cpuCoeff: Double = 3.0
   protected val memCoeff: Double = 1.0
 
   /**
@@ -621,9 +624,9 @@ object HarvestVMContainerPoolBalancer extends LoadBalancerProvider {
                avail_mem: Long, 
                score: Double) = this_invoker.getAvailResources(
             maxCpuUtil, maxMemUtil, cpuCoeff, memCoeff)
-          // logging.warn(this, s"check invoker${this_invoker_id} availCpu ${avail_cpu} availMem ${avail_mem} score ${score}")
+          logging.warn(this, s"check invoker${this_invoker_id} availCpu ${avail_cpu} availMem ${avail_mem} score ${score} reqCpu ${reqCpu} reqMemory ${reqMemory} this_invoker.cpu ${this_invoker.cpu} cpuLimit ${cpuLimit}")
 
-          if(avail_cpu >= reqCpu && avail_mem >= reqMemory && this_invoker.cpu > cpuLimit) {
+          if(avail_cpu >= reqCpu && avail_mem >= reqMemory && this_invoker.cpu >= cpuLimit) {
             invokerSetAvailCpu = invokerSetAvailCpu + max(avail_cpu, 0)
             invokerSetAvailMem = invokerSetAvailMem + max(avail_mem, 0)
             if(id_unloaded < 0 || unloaded_score > score) {
@@ -915,8 +918,10 @@ class SyncControllerState(val _timeout: Long = 10*1000)(implicit logging: Loggin
         } 
       }
       controllerGossipTime = newMap
+      /*
       logging.info(
           this, s"num_peer_controllers = ${controllerGossipTime.size}, clusterSize = ${clusterSize}")
+      */
     }
   }
 }
@@ -1113,10 +1118,12 @@ case class HarvestVMContainerPoolBalancerState(
       s"no update required - number of known invokers unchanged: $newSize. details: $invokerDetails."
     }
 
+    /*
     logging.info(
       this,
       s"loadbalancer invoker status updated. managedInvokers = $managed blackboxInvokers = $blackboxes. $logDetail")(
       TransactionId.loadbalancer)
+    */
   }
 
   /**

@@ -153,7 +153,8 @@ abstract class CommonLoadBalancer(config: WhiskConfig,
   }
   /* states related to invoker set of each function, yanqi*/
   // maxInvokerId to form the end point of ring in consistent hashing
-  protected[loadBalancer] val maxInvokerId: Int = 499
+  // protected[loadBalancer] val maxInvokerId: Int = 499
+  protected[loadBalancer] val maxInvokerId: Int = 56
   // keeps the (home_invoker, hashsed_function_id) for each function
   // home_invoker is the real id (not index) of the home invoker of the function
   protected[loadBalancer] val functionHomeInvoker = TrieMap[FullyQualifiedEntityName, (Int, Int)]()

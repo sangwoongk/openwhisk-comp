@@ -83,7 +83,8 @@ abstract class CommonLoadBalancer(config: WhiskConfig,
   protected val functionSampleRate: Double = 1.0
   protected val functionSampleUseExpectation: Boolean = false
   protected val cpuUtilWindow:Int = 50
-  protected val redundantRatio: Double = 1.001
+  // protected val redundantRatio: Double = 1.001
+  protected val redundantRatio: Double = 1.5  // pickme
   protected val randomGen = Random
   protected val maxCpuLimit: Double = 2.0
   protected val minCpuLimit: Double = 1.0

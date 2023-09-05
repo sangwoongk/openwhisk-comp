@@ -371,7 +371,7 @@ class InvokerReactive(
       buffer_kvp.close
     }
     else {
-      memory = 2560
+      memory = 2048
     }
     
     healthProducer.send("health", PingMessage(instance, cpu, memory)).andThen {

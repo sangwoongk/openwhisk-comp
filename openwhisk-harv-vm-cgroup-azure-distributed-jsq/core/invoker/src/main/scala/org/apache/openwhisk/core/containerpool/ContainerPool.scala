@@ -22,7 +22,7 @@ import org.apache.openwhisk.common.{AkkaLogging, LoggingMarkers, TransactionId}
 import org.apache.openwhisk.core.connector.MessageFeed
 import org.apache.openwhisk.core.entity._
 import org.apache.openwhisk.core.entity.size._
-
+import java.time.Instant
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.concurrent.duration._
@@ -186,7 +186,16 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
       if(cpuUtil <= 0)
         cpuUtil = r.action.limits.cpu.cores
 
-      logging.info(this, s"action: ${r.action.name}, cpuLimit: ${cpuLimit}, cpuUtil: ${cpuUtil}, originLimit: ${r.action.limits.cpu.cores}, originUtil: ${r.action.limits.cpu.cores}")
+      //sghan
+      // comment by swkim
+      /* if (!CpuCounter.transidBuffer.contains(r.msg.transid)) {
+        CpuCounter.transidBuffer(r.msg.transid) = cpuUtil
+        CpuCounter.reqCpu += cpuUtil
+        println(s"${Instant.now().toEpochMilli},[sghanReq] reqCPU,${f"${CpuCounter.reqCpu}%.1f"}")
+      } */
+
+      val skipHasSpaceFor: Boolean = r.action.name.toString.contains("invokerHealth")
+      logging.info(this, s"action: ${r.action.name}, cpuLimit: ${cpuLimit}, cpuUtil: ${cpuUtil}, originLimit: ${r.action.limits.cpu.cores}, originUtil: ${r.action.limits.cpu.cores}, skipHasSpaceFor: ${skipHasSpaceFor}")
       // Only process request, if there are no other requests waiting for free slots, or if the current request is the
       // next request to process
       // It is guaranteed, that only the first message on the buffer is resent.
@@ -198,7 +207,7 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         val createdContainer =
           // Is there enough space on the invoker for this action to be executed.
           // if (hasPoolSpaceFor(busyPool, r.action.limits.memory.megabytes.MB, cpuUtil)) {
-          if (hasSpaceFor(r.action.limits.memory.megabytes.MB)) {
+          if (hasSpaceFor(r.action.limits.memory.megabytes.MB) || skipHasSpaceFor) {
             // Schedule a job to a warm container
             ContainerPool
               .schedule(r.action, r.msg.user.namespace.name, freePool, cpuLimit, cpuUtil)
@@ -269,6 +278,16 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
               // runBuffer.dequeueOption.foreach { case (run, _) => self ! run }
               processBufferOrFeed()
             }
+
+            //sghan
+            if (!CpuCounter.transidBuffer.contains(r.msg.transid)) {
+              CpuCounter.transidBuffer(r.msg.transid) = cpuUtil
+              CpuCounter.reqCpu += cpuUtil
+              CpuCounter.memCount += 1.0
+              // println(s"${Instant.now().toEpochMilli},[sghanReq] reqCPU,${f"${CpuCounter.reqCpu/2.0 + CpuCounter.memCount/16.0}%.1f"}")
+              println(s"${Instant.now().toEpochMilli},[sghanReq] reqCPU,${CpuCounter.reqCpu},mem,${CpuCounter.memCount*128}")
+            }
+
             actor ! r // forwards the run request to the container
             logContainerStart(r, containerState, newData.activeActivationCount, container)
           case None =>
@@ -567,6 +586,10 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         logging.info(this, s"Invoker cgroupCpuUsage, cgroupMemUsage = ${cgroupCpuUsage}, ${cgroupMemUsage}")
         logging.info(this, s"Invoker mean_cgroupCpuUsage, mean_cgroupMemUsage = ${mean_cpu_usage}, ${mean_mem_usage}")
       }
+      //sghan
+      // println(s"${Instant.now().toEpochMilli},[sghanTest] CPU,${f"${2.0 - cgroupCpuUsage}%.3f"}, Memory,${f"${2048 - cgroupMemUsage}"}")
+      // println(s"${Instant.now().toEpochMilli},[sghanReq] reqCPU,${f"${CpuCounter.reqCpu/2.0 + CpuCounter.memCount/16.0}%.1f"}")
+      println(s"${Instant.now().toEpochMilli},[sghanReq] reqCPU,${CpuCounter.reqCpu},mem,${CpuCounter.memCount*128}")
 
       if(Files.exists(Paths.get(overSubscribedRatePath))) {
         val buffer_oversub = Source.fromFile(overSubscribedRatePath)
@@ -687,6 +710,12 @@ object ContainerPool {
       case (ref, w: WarmedData) if w.activeActivationCount == 0 =>
         ref -> w
     }
+
+    //sghan
+    // temp comment by swkim
+    // CpuCounter.memCount -= 1.0
+    // if (CpuCounter.memCount < 0) CpuCounter.memCount = 0.0
+    // println(s"${Instant.now().toEpochMilli},[sghanReq] reqCPU,${f"${CpuCounter.reqCpu/2.0 + CpuCounter.memCount/16.0}%.1f"}")
 
     // if (memory > 0.B && cpu > 0 && freeContainers.nonEmpty && memoryConsumptionOf(freeContainers) >= memory.toMB) {
     if (memory > 0.B && freeContainers.nonEmpty && memoryConsumptionOf(freeContainers) >= memory.toMB) {

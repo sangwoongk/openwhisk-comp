@@ -12,9 +12,10 @@ for ((nodes=$NODE_START;nodes<=$NODE_END;nodes++))
 do
 	sudo ssh -p 20022 root@10.150.21.$(($WORKER_IP+$nodes)) 'cd /home/caslab/vm-openwhisk; ./destroy_vm.sh' &
 done
+wait < <(jobs -p)
 
-echo "Sleep for 60s"
-sleep 60
+echo "Sleep for 10s"
+sleep 10
 
 for ((nodes=$NODE_START;nodes<=$NODE_END;nodes++))
 do

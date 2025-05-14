@@ -870,6 +870,22 @@ object ContainerProxy {
       }
     }
 
+    //sghan
+    // temp comment by swkim
+    // if (CpuCounter.transidBuffer.contains(job.msg.transid)) {
+    //   val removeDouble = CpuCounter.transidBuffer(job.msg.transid)
+    //   CpuCounter.transidBuffer.remove(job.msg.transid)
+    //   CpuCounter.reqCpu -= removeDouble
+
+    //   // added by swkim
+    //   CpuCounter.memCount -= 1.0
+    //   if (CpuCounter.memCount < 0) CpuCounter.memCount = 0.0
+
+    //   // println(s"${Instant.now().toEpochMilli},[sghanReq] reqCPU,${f"${CpuCounter.reqCpu}%.1f"}")
+    //   // println(s"${Instant.now().toEpochMilli},[sghanReq] reqCPU,${f"${CpuCounter.reqCpu/2.0 + CpuCounter.memCount/16.0}%.1f"}")
+    //   println(s"${Instant.now().toEpochMilli},[sghanReq] reqCPU,${CpuCounter.reqCpu},mem,${CpuCounter.memCount*128}")
+    // }
+
     val initTime = {
       initInterval.map(initTime => Parameters(WhiskActivation.initTimeAnnotation, initTime.duration.toMillis.toJson))
     }

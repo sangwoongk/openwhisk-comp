@@ -168,6 +168,65 @@ class InvokerReactive(
     }
   }
 
+  // swkim
+  def check_actual_cpu_usage(): Boolean = {
+    var rscFileExists: Boolean = true
+    if(Files.exists(Paths.get(cgroupCpuPath))) {
+      val buffer_cgroup_cpu = Source.fromFile(cgroupCpuPath)
+      val lines_cgroup = buffer_cgroup_cpu.getLines.toArray
+      var cpu_time: Long = 0
+      
+      if(lines_cgroup.size == 1) {
+        cpu_time = lines_cgroup(0).toLong
+      }
+      if(cgroupCheckTime == 0) {
+        cgroupCheckTime = System.nanoTime
+        cgroupCpuTime = cpu_time
+      } else {
+        var curns: Long = System.nanoTime
+        // update
+        cgroupCpuUsage = ((cpu_time - cgroupCpuTime).toDouble / (curns - cgroupCheckTime))
+        cgroupCpuUsage = (cgroupCpuUsage * 1000).toInt/1000.0
+
+        cgroupCheckTime = curns
+        cgroupCpuTime = cpu_time
+      }
+      buffer_cgroup_cpu.close
+    } else {
+      logging.warn(this, s"${cgroupCpuPath} does not exist")
+      rscFileExists = false
+    }
+
+    rscFileExists
+  }
+
+  def check_actual_mem_usage(): Boolean = {
+    var rscFileExists: Boolean = true
+    if(Files.exists(Paths.get(cgroupMemPath))) {
+      val buffer_cgroup_mem = Source.fromFile(cgroupMemPath)
+      val lines_cgroup = buffer_cgroup_mem.getLines.toArray
+      var mem_usage: Long = 0  
+
+      var total_cache: Long = 0
+      var total_rss: Long = 0
+
+      for(line <- lines_cgroup) {
+        if(line.contains("total_cache")) {
+          total_cache = line.split(" ")(1).toLong/(1024*1024)
+        } else if(line.contains("total_rss")) {
+          total_rss = line.split(" ")(1).toLong/(1024*1024)
+        }
+      }
+      buffer_cgroup_mem.close
+      cgroupMemUsage = total_cache + total_rss
+    } else {
+      logging.warn(this, s"${cgroupMemPath} does not exist")
+      rscFileExists = false
+    }
+
+    rscFileExists
+  }
+
   /***** controller accounting. yanqi *****/
   class SyncIdMap() {
     var syncMap: MMap[String, Long] = MMap[String, Long]()
@@ -370,6 +429,16 @@ class InvokerReactive(
             .flatMap { action =>
               action.toExecutableWhiskAction match {
                 case Some(executable) =>
+
+                  // swkim - MODE 1
+                  val rscFileExists = check_actual_cpu_usage() && check_actual_mem_usage()
+                  if (rscFileExists) {
+                    cgroupWindow(cgroupWindowPtr) = (cgroupCpuUsage, cgroupMemUsage)
+                    proceed_cgroup_window_ptr()
+                    val (max_cpu_usage, max_mem_usage) = get_max_rsc_usage()
+                    println(s"${Instant.now().toEpochMilli},[sghanReq] max_cpu_usage,${max_cpu_usage},max_mem_usage,${max_mem_usage}")
+                  }
+
                   pool ! Run(executable, msg)
                   Future.successful(())
                 case None =>
@@ -496,6 +565,7 @@ class InvokerReactive(
       memory = 2048
     }
     
+    /*
     var rscFileExists: Boolean = true
     // check actual cpu usage
     if(Files.exists(Paths.get(cgroupCpuPath))) {
@@ -546,6 +616,9 @@ class InvokerReactive(
       logging.warn(this, s"${cgroupMemPath} does not exist")
       rscFileExists = false
     }
+    */
+    val rscFileExists = check_actual_cpu_usage() && check_actual_mem_usage()
+
     var mean_cpu_usage: Double = 0.0
     var max_cpu_usage: Double = 0.0
     var mean_mem_usage: Long = 0
@@ -559,8 +632,8 @@ class InvokerReactive(
       val (c_m, m_m) = get_max_rsc_usage()
       max_cpu_usage = c_m
       max_mem_usage = m_m
-      logging.info(this, s"healthPing cpu=${cpu}, mem=${memory}, cgroupCpuUsage=${cgroupCpuUsage}, cgroupMemUsage=${cgroupMemUsage}")
-      logging.info(this, s"healthPing mean_cgroupCpuUsage=${mean_cpu_usage}, mean_cgroupMemUsage=${mean_mem_usage}, max_cgroupCpuUsage=${max_cpu_usage}, max_cgroupMemUsage=${max_mem_usage}")
+      // logging.info(this, s"healthPing cpu=${cpu}, mem=${memory}, cgroupCpuUsage=${cgroupCpuUsage}, cgroupMemUsage=${cgroupMemUsage}")
+      // logging.info(this, s"healthPing mean_cgroupCpuUsage=${mean_cpu_usage}, mean_cgroupMemUsage=${mean_mem_usage}, max_cgroupCpuUsage=${max_cpu_usage}, max_cgroupMemUsage=${max_mem_usage}")
     }
     /*
     // parse azure scheduled vm events    
@@ -609,6 +682,9 @@ class InvokerReactive(
     }
     */
     val vm_event_sched = false
+
+    // swkim
+    println(s"${Instant.now().toEpochMilli},[sghanReq] max_cpu_usage,${max_cpu_usage},max_mem_usage,${max_mem_usage}")
 
     // send the health ping
     healthProducer.send("health", PingMessage(
